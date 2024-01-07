@@ -1,15 +1,24 @@
 import company_tickers from './company_tickers.json' assert { type: 'json' };
 import {getDocNumber} from './server.js';
 
-async function startDL(){
-    for(const obj of Object.values(company_tickers).slice(0,25)){
-        const ticker = obj.ticker;
-        const sql = global.sqlconn;
+async function startFilingsDownload(oo){
+    let toDL_list;
+    const sql = global.sqlconn;
+    if(oo.mode == 'update') toDL_list = (await sql.query(`select cik from companies`))?.recordset;
+    if(oo.mode == 'update') toDL_list = (await sql.query(`
+        select c.cik 
+        from companies c
+        left join filings f on (f.cik=c.cik and f.year >= datepart(year, getdate())-1 )
+        where f.cik is null`))?.recordset;
+    toDL_list = toDL_list.map(x=>x.cik);
 
-        const cik = (await sql.query(`SELECT top 1 cik from companies where symbol='${ticker}'`)).recordset[0].cik;
-        await getDocNumber({cik, year:2019, type:'annual'});
+    console.log(`Pulling ${toDL_list.length} tickers`);
+
+
+    for(const cik of toDL_list){
+        await getDocNumber({cik, type:'annual'});
     }
     
 }
 
-export {startDL};
+export {startFilingsDownload};

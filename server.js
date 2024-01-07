@@ -136,7 +136,7 @@ async function getDocNumber(oo){
     if(DBcheck) return DBcheck;
   }
 
-  const browser = await puppeteer.launch({headless: false});
+  const browser = await puppeteer.launch({headless: 'new'});
   const page = await browser.newPage();
   await page.setExtraHTTPHeaders({   
     'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36',

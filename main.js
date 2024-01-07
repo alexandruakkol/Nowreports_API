@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import sql from 'mssql';
 import { startServer } from './webserver.js';
-import {startDL} from './DLfilings.js';
+import {startFilingsDownload} from './DLfilings.js';
 
 dotenv.config();
 
@@ -14,7 +14,9 @@ async function start(){
         global.sqlconn = sql;
         //--------------- MODULE START ---------------
         startServer();
-        //startDL();
+        //--------------- CUSTOM APPS ---------------
+        if(process.argv[2] === 'populate-append') startFilingsDownload({mode:'append'});
+        if(process.argv[2] === 'populate-update') startFilingsDownload({mode:'update'});
     } catch (err) {
         console.log(err);
     }
