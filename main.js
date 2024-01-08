@@ -17,6 +17,7 @@ async function start(){
         //--------------- CUSTOM APPS ---------------
         if(process.argv[2] === 'populate-append') startFilingsDownload({mode:'append'});
         if(process.argv[2] === 'populate-update') startFilingsDownload({mode:'update'});
+        if(process.argv[2] === 'populate-append-reverse') startFilingsDownload({mode:'append-reverse'});
     } catch (err) {
         console.log(err);
     }
