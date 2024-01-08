@@ -33,8 +33,6 @@ function sleep(ms) {
 }
 //////////////////////// ======= PROGRAM ======== \\\\\\\\\\\\\\\\\\\\\\\\
 
-const documents = [ "Give me the operating income of paychex in the last report" ];
-
 async function sendDatapointsToDB(oo, cik){
   const {reportURL, year, date, type} = oo;
   if(!reportURL) return console.error('sendDatapointsToDB : No reportURL');
@@ -227,49 +225,4 @@ async function getDocNumber(oo){
   console.log('0 ', cik);
 }
 
-async function ask(question){
-  const requestData = {
-    question,
-    // records: [
-    //   {id:1}
-    // ],
-    // language: 'en',
-    // stringIndexType: 'Utf16CodeUnit',
-    
-  };
-
-  const headers = {
-    'Ocp-Apim-Subscription-Key': key,
-    'Content-Type': 'application/json'
-  };
-  const url = `${endpoint}language/:query-knowledgebases?api-version=2021-10-01&projectName=nowReports&deploymentName=test`;
-  const res = await axios.post(url, requestData, {headers}).catch(err => console.log(err));
-  return res.data;
-}
-
-// example of how to use the client library to recognize entities in a document.
-async function main() {
-    console.log("== NER sample ==");
-  
-    const client = new TextAnalysisClient(endpoint, new AzureKeyCredential(key));
-  
-    const results = await client.analyze("EntityRecognition", documents);
-  
-    for (const result of results) {
-      console.log(`- Document ${result.id}`);
-      if (!result.error) {
-        console.log("\tRecognized Entities:");
-        for (const entity of result.entities) {
-            if(entity.category === 'Organization') input_org = entity.text;
-          console.log(`\t- Entity ${entity.text} of type ${entity.category}`);
-        }
-      } else console.error("\tError:", result.error);
-    }
-
-    const {cik_str} = CIKlookup(input_org);
-    if(!cik_str) throw new Error(`No CIK for input '${input_org}'`);
-
-    console.log(cik_str);
-  }
-
-  export {getDocNumber, sendErrorCIKToDB};
+export {getDocNumber, sendErrorCIKToDB};

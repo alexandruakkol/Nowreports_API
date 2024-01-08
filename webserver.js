@@ -12,9 +12,13 @@ let sql;
 app.use(cors());
 app.use(express.json());
 const fuse_options = {
-    keys: ['ticker', 'title']
+    keys: ['symbol', 'name']
 };
-const fuse = new Fuse(Object.values(company_tickers), fuse_options);
+let fuse;
+
+async function makeFuse(companies){ // side effects! 
+    fuse = new Fuse(companies, fuse_options);
+}
 
 function padNumberWithZeros(number, length) {
     return String(number).padStart(length, '0');
@@ -32,6 +36,11 @@ function generateRandomString(length) {
     return randomString;
 }
 
+async function db_getAllCompanies(){
+    const request = new sql.Request();
+    return await request.execute('dbo.getAllCompanies');
+}
+
 function clientError(res, message=null){
     res.statusCode = 400;
     res.json(message && message);
@@ -40,17 +49,14 @@ function clientError(res, message=null){
 function CIKlookup(companyName, options){
     console.log(`== CIK lookup for ${companyName} ==`);
 
-    const res = fuse.search(companyName, {limit: options?.top || 7});
+    const res = fuse.search(companyName, {limit: options?.top || 5});
 
-    // // CIK needs to have 10 digits with leading 0s
-    // res.cik_str = padNumberWithZeros(item.cik_str, 10);
     const processed_res = [];
     
     for(let i=0; i<res.length; i++){
         const _tmp = res[i].item;
-        _tmp.value=_tmp.title;
+        _tmp.value=_tmp.name;
         _tmp.key=i;
-
         processed_res.push(_tmp);
     }
     return processed_res;
@@ -105,7 +111,6 @@ app.get('/links', async (req, res) => {
     if( isNaN(Number(q)) ) cik = String(CIKlookup(q, {top:1})?.[0]?.cik_str); // if symbol, get CIK
     else cik = q;
 
-    console.log({cik})
     if(!cik || isNaN(Number(cik))) return clientError(res, '"q" param: invalid ticker');
     const docnr = await getDocNumber({cik,year,type}).catch(err=>console.log(err));
     res.json(docnr);
@@ -128,6 +133,8 @@ app.post('/reports', async (req, res) => {
 
 async function startServer(){
     sql = global.sqlconn;
+    const companies = (await db_getAllCompanies().catch(err=>console.log(err))).recordsets[0];
+    await makeFuse(companies);
 
     app.listen(PORT, () => {
         console.log('Listening on ' + PORT);

@@ -1,15 +1,14 @@
-import company_tickers from './company_tickers.json' assert { type: 'json' };
 import {getDocNumber, sendErrorCIKToDB} from './server.js';
 
 async function startFilingsDownload(oo){
     let toDL_list;
     const sql = global.sqlconn;
-    if(oo.mode == 'update') toDL_list = (await sql.query(`select cik from companies order by mcap desc`))?.recordset;
+    if(oo.mode == 'update') toDL_list = (await sql.query(`select cik from companies where c.country='United States' order by mcap desc`))?.recordset;
     if(oo.mode.startsWith('append') ) toDL_list = (await sql.query(`
         select c.cik 
         from companies c
         left join filings f on (f.cik=c.cik and f.year >= datepart(year, getdate())-1 )
-        where f.cik is null 
+        where f.cik is null and c.country='United States'
         order by mcap desc
         `))?.recordset;
         
