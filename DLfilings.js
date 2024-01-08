@@ -1,5 +1,5 @@
 import company_tickers from './company_tickers.json' assert { type: 'json' };
-import {getDocNumber} from './server.js';
+import {getDocNumber, sendErrorCIKToDB} from './server.js';
 
 async function startFilingsDownload(oo){
     let toDL_list;
@@ -17,7 +17,12 @@ async function startFilingsDownload(oo){
 
     for(const cik of toDL_list){
         console.log('pulling ', cik);
-        await getDocNumber({cik, type:'annual'});
+        try{
+            await getDocNumber({cik, type:'annual'});
+        }
+        catch(err){
+            sendErrorCIKToDB(cik);
+        }
         console.log('pulled ', cik);
 
     }

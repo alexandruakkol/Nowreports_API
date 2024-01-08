@@ -35,9 +35,8 @@ function sleep(ms) {
 
 const documents = [ "Give me the operating income of paychex in the last report" ];
 
-async function sendDatapointsToDB(url, cik){
-  const {reportURL, year, date, type} = url;
-  console.log('sendDatapointsToDB ',url)
+async function sendDatapointsToDB(oo, cik){
+  const {reportURL, year, date, type} = oo;
   if(!reportURL) return console.error('sendDatapointsToDB : No reportURL');
   const request = new sql.Request();
   request.input('cik', sql.NVarChar(100), cik);
@@ -48,22 +47,32 @@ async function sendDatapointsToDB(url, cik){
   await request.execute('dbo.updateFilings').catch(err=>console.log(err));
 }
 
+async function sendErrorCIKToDB(oo){
+  const {cik, typ} = oo;
+  if(!cik?.length) return console.error('sendErrorCIKToDB : No CIK');
+  console.log(' ----- Could not get '+ cik );
+  const request = new sql.Request();
+  request.input('cik', sql.NVarChar(100), cik);
+  request.input('typ', sql.NVarChar(20), typ);
+  await request.execute('dbo.updateFilings').catch(err=>console.log(err));
+}
+
 function CIKlookup(companyName){
-    console.log(`== CIK lookup for ${companyName} ==`);
-    
-    const options = {
-      keys: ['title']
-    };
+  console.log(`== CIK lookup for ${companyName} ==`);
+  
+  const options = {
+    keys: ['title']
+  };
 
-    const fuse = new Fuse(Object.values(company_tickers), options);
-    const {item} = fuse.search(companyName, {limit:1})[0];
+  const fuse = new Fuse(Object.values(company_tickers), options);
+  const {item} = fuse.search(companyName, {limit:1})[0];
 
-    isDevelopment ?? console.log(`Found CIK for ${item.title}`);
+  isDevelopment ?? console.log(`Found CIK for ${item.title}`);
 
-    // CIK needs to have 10 digits with leading 0s
-    item.cik_str = padNumberWithZeros(item.cik_str, 10);
+  // CIK needs to have 10 digits with leading 0s
+  item.cik_str = padNumberWithZeros(item.cik_str, 10);
 
-    return item;
+  return item;
 }
 
 async function check_get_report(reportData, page){ // gets a particular report (filename) by year/type/company (ex. 2023 Annual AAPL)
@@ -164,7 +173,6 @@ async function getDocNumber(oo){
 
   //first, check if the list of 0 codes has any 10-ks
   let foundObj = await checkCandidateReports(reports);
-  console.log({foundObj}); 
 
   if(foundObj) {
     cleanup(foundObj, browser, cik);
@@ -187,7 +195,6 @@ async function getDocNumber(oo){
 
     if(string_res_2.length > 8){
       const check_get = await check_get_report({cik, accesionNo:accession}, page);
-      console.log({check_get})
       if(check_get?.reportURL) {
         foundObj = check_get;
         console.log({foundObj});
@@ -265,18 +272,4 @@ async function main() {
     console.log(cik_str);
   }
 
-  async function anwserQuestion(question){
-
-  }
-// main().catch((err) => {
-//     console.error("The sample encountered an error:", err);
-// });
-async function start(){
-  //sql = await DBConn();
-  const doc = await getDocNumber({cik:723531, year:2022, type:'annual'});
-  console.log({doc});
-}
-//ask('what is the filing date of the PAYX 10-Q?');
-//main();
-//ask('whos the reporter?' , 'They have announced that the weather today will be very sunny with lots of sunny sun in the bright sky. The report is andrew fk.');
-export {getDocNumber};
+  export {getDocNumber, sendErrorCIKToDB};
