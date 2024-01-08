@@ -25,6 +25,7 @@ async function startFilingsDownload(oo){
             await getDocNumber({cik, type:'annual'});
         }
         catch(err){
+            console.log(err)
             sendErrorCIKToDB(cik);
         }
         console.log('pulled ', cik);
