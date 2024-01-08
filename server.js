@@ -12,7 +12,7 @@ const BASE_URL = 'https://www.sec.gov/Archives/edgar';
 const BASE_DATA_URL = BASE_URL+ '/data/';
 let input_org;
 let sql;
-
+const PUP_BROWSER_CONFIG = {headless: 'new'};
 //////////////////////// ======= DEV MODE ======== \\\\\\\\\\\\\\\\\\\\\\\\
 let isDevelopment = true;
 if(!['production','development'].includes(process.env.NODE_ENV)){
@@ -20,11 +20,13 @@ if(!['production','development'].includes(process.env.NODE_ENV)){
     isDevelopment = true;
 }
 if(process.env.NODE_ENV === 'production') isDevelopment = false;
+if(!isDevelopment) PUP_BROWSER_CONFIG.executablePath = '/bin/chromium';
+
 console.log(`\n----- Running as ${process.env.NODE_ENV?.toUpperCase() ?? 'DEVELOPMENT'} -----\n`);
 
 //////////////////////// ======= UTILS ======== \\\\\\\\\\\\\\\\\\\\\\\\
 function padNumberWithZeros(number, length) {
-    return String(number).padStart(length, '0');
+  return String(number).padStart(length, '0');
 }
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -67,7 +69,7 @@ function CIKlookup(companyName){
 async function check_get_report(reportData, page){ // gets a particular report (filename) by year/type/company (ex. 2023 Annual AAPL)
   // in: accession number | out: foundObj  if 10-K is found
   let {cik, accesionNo, year, type} = reportData;
-  if(!accesionNo) return;
+  if(!accesionNo) return console.error('check_get_report : no accessionNo');
   // accesion no. formatting
   const n_long =  accesionNo.slice(-6);
   const n_short =  accesionNo.slice(-8, -6);
@@ -125,7 +127,7 @@ async function getDocNumber(oo){
   if(!sql) sql = global.sqlconn;
   let {cik, year, type} = oo;  
   if(!type) type='annual';
-  if(!['annual', 'quarterly'].includes(type)) return;
+  if(!['annual', 'quarterly'].includes(type)) return console.error('getDocNumber no type');
   if(!year) year = (new Date()).getFullYear();
 
   if(type == 'annual') type = '10-K';
@@ -136,7 +138,7 @@ async function getDocNumber(oo){
     if(DBcheck) return DBcheck;
   }
 
-  const browser = await puppeteer.launch({headless: 'new'});
+  const browser = await puppeteer.launch({headless: 'new', executablePath: '/bin/chromium'});
   const page = await browser.newPage();
   await page.setExtraHTTPHeaders({   
     'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36',
