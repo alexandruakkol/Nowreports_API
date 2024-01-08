@@ -16,7 +16,10 @@ async function startFilingsDownload(oo){
 
 
     for(const cik of toDL_list){
+        console.log('pulling ', cik);
         await getDocNumber({cik, type:'annual'});
+        console.log('pulled ', cik);
+
     }
     
 }

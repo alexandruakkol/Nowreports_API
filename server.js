@@ -84,7 +84,7 @@ async function check_get_report(reportData, page){ // gets a particular report (
     // filter by report type
     //console.log(document.querySelectorAll('.tableFile[summary="Document Format Files"] > tbody > tr')).filter(tr => tr.children[1].textContent.startsWith('10'))
     const reportList = Array.from(document.querySelectorAll('.tableFile[summary="Document Format Files"] > tbody > tr'));
-    const reportRow = reportList.filter(tr => tr.children[1].textContent.startsWith('10-K'))[0];
+    const reportRow = reportList.filter(tr => tr.children[1].textContent.includes('10-K'))[0];
 
     return JSON.stringify({year:reportYear, doc:reportRow?.children[2]?.innerText, type:reportRow?.children[1]?.textContent, date:reportDate});
   });
@@ -138,7 +138,7 @@ async function getDocNumber(oo){
     if(DBcheck) return DBcheck;
   }
 
-  const browser = await puppeteer.launch({headless: 'new', executablePath: '/bin/chromium'});
+  const browser = await puppeteer.launch({headless: 'new'});
   const page = await browser.newPage();
   await page.setExtraHTTPHeaders({   
     'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36',
@@ -168,6 +168,7 @@ async function getDocNumber(oo){
 
   if(foundObj) {
     cleanup(foundObj, browser, cik);
+    console.log('1')
     return foundObj;
   }
 
@@ -178,7 +179,7 @@ async function getDocNumber(oo){
     await page.goto(`${BASE_URL}/data/${cik}/${accession}`, { waitUntil: "domcontentloaded" }, { timeout: 0 });
     let string_res_2 =  await page.evaluate(() => {
       function getDocs(document){
-        return Array.from(document.querySelectorAll('td > a')).map(x => x.innerText).slice(0,50);
+        return Array.from(document.querySelectorAll('td > a')).map(x => x.innerText).slice(0,150);
       }
       const docs = getDocs(document);
       return docs;
@@ -186,6 +187,7 @@ async function getDocNumber(oo){
 
     if(string_res_2.length > 8){
       const check_get = await check_get_report({cik, accesionNo:accession}, page);
+      console.log({check_get})
       if(check_get?.reportURL) {
         foundObj = check_get;
         console.log({foundObj});
@@ -196,6 +198,7 @@ async function getDocNumber(oo){
 
   if(foundObj) {
     cleanup(foundObj, browser, cik);
+    console.log('2')
     return foundObj;
   }
 
@@ -207,14 +210,14 @@ async function getDocNumber(oo){
 
   async function checkCandidateReports(list){
     //TODO: remove slice
-    for(let i=0; i<100; i++){
+    for(let i=0; i<list.length; i++){
       if(i%9 === 0) await sleep(1000); //rate limiting for SEC;
       const foundReport = await check_get_report({cik, accesionNo:list[i], year, type}, page);
       if(!foundReport) continue;
       if((Number(foundReport.year) <= Number(year)) && (foundReport.type == type)) {return foundReport;}
     }
   }
-
+  console.log('0 ', cik);
 }
 
 async function ask(question){
