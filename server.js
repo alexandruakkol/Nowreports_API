@@ -16,7 +16,7 @@ const PUP_BROWSER_CONFIG = {headless: 'new'};
 //////////////////////// ======= DEV MODE ======== \\\\\\\\\\\\\\\\\\\\\\\\
 let isDevelopment = true;
 if(!['production','development'].includes(process.env.NODE_ENV)){
-    console.warn('\nYou did not specify the environment. (NODE_ENV=developoment node server)');
+    console.warn('\nYou did not specify the environment. (NODE_ENV=development node server)');
     isDevelopment = true;
 }
 if(process.env.NODE_ENV === 'production') isDevelopment = false;
@@ -138,7 +138,7 @@ async function getDocNumber(oo){
     if(DBcheck) return DBcheck;
   }
 
-  const browser = await puppeteer.launch({headless: 'new'});
+  const browser = await puppeteer.launch(PUP_BROWSER_CONFIG);
   const page = await browser.newPage();
   await page.setExtraHTTPHeaders({   
     'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36',
