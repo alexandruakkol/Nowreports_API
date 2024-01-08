@@ -4,23 +4,34 @@ import Fuse from 'fuse.js';
 import { TextAnalysisClient, AzureKeyCredential } from '@azure/ai-language-text';
 import puppeteer from 'puppeteer';
 import dotenv from 'dotenv';
+import fs from 'fs';
 
 dotenv.config();
 const key = process.env.COGNITIVEAPIKEY;
 const endpoint = 'https://researchr.cognitiveservices.azure.com/';
 const BASE_URL = 'https://www.sec.gov/Archives/edgar';
 const BASE_DATA_URL = BASE_URL+ '/data/';
-let input_org;
 let sql;
 const PUP_BROWSER_CONFIG = {headless: 'new'};
+
 //////////////////////// ======= DEV MODE ======== \\\\\\\\\\\\\\\\\\\\\\\\
+
+const distro = getEnvironment();
+
 let isDevelopment = true;
 if(!['production','development'].includes(process.env.NODE_ENV)){
     console.warn('\nYou did not specify the environment. (NODE_ENV=development node server)');
     isDevelopment = true;
 }
 if(process.env.NODE_ENV === 'production') isDevelopment = false;
-if(!isDevelopment) PUP_BROWSER_CONFIG.executablePath = '/bin/chromium';
+
+if(!isDevelopment){
+  switch(distro){
+    case 'Ubuntu': PUP_BROWSER_CONFIG.executablePath = '/snap/bin/chromium'; break;
+    case 'Kali': PUP_BROWSER_CONFIG.executablePath = '/bin/chromium'; break;
+    default: PUP_BROWSER_CONFIG.executablePath = '/bin/chromium';
+  }
+} 
 
 console.log(`\n----- Running as ${process.env.NODE_ENV?.toUpperCase() ?? 'DEVELOPMENT'} -----\n`);
 
@@ -31,6 +42,26 @@ function padNumberWithZeros(number, length) {
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
+function getEnvironment(){
+  let distro;
+  try{
+    const file = fs.readFileSync('/etc/os-release', 'utf8');
+    if (!file) return distro = 'macOS';
+    const lines = file.split('\n');
+    lines.forEach(line => {
+
+      if (line.startsWith('PRETTY_NAME')) distro = line.split('=')[1].replace(/"/g, '');
+    });
+    if(!distro) distro = 'macOS';
+
+  } catch{distro='macOS'}
+
+  if(distro.includes('Ubuntu')) distro = 'Ubuntu';
+  if(distro.includes('Kali')) distro = 'Kali';
+
+  return distro;
+}
+
 //////////////////////// ======= PROGRAM ======== \\\\\\\\\\\\\\\\\\\\\\\\
 
 async function sendDatapointsToDB(oo, cik){
