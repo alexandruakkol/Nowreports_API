@@ -26,7 +26,7 @@ async function startFilingsDownload(oo){
         }
         catch(err){
             console.log(err)
-            sendErrorCIKToDB(cik);
+            sendErrorCIKToDB({cik, typ:'10-K'});
         }
         console.log('pulled ', cik);
 
