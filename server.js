@@ -1,16 +1,13 @@
 import axios from 'axios';
 import company_tickers from './company_tickers.json' assert { type: 'json' };
 import Fuse from 'fuse.js';
-import { TextAnalysisClient, AzureKeyCredential } from '@azure/ai-language-text';
 import puppeteer from 'puppeteer';
 import dotenv from 'dotenv';
 import fs from 'fs';
 
 dotenv.config();
-const key = process.env.COGNITIVEAPIKEY;
-const endpoint = 'https://researchr.cognitiveservices.azure.com/';
-const BASE_URL = 'https://www.sec.gov/Archives/edgar';
-const BASE_DATA_URL = BASE_URL+ '/data/';
+let BASE_DATA_URL;
+
 let sql;
 const PUP_BROWSER_CONFIG = {headless: 'new'};
 
@@ -29,7 +26,6 @@ if(!isDevelopment){
   switch(distro){
     case 'Ubuntu': PUP_BROWSER_CONFIG.executablePath = '/snap/bin/chromium'; break;
     case 'Kali': PUP_BROWSER_CONFIG.executablePath = '/bin/chromium'; break;
-    default: PUP_BROWSER_CONFIG.executablePath = '/bin/chromium';
   }
 } 
 
@@ -111,7 +107,7 @@ async function check_get_report(reportData, page){ // gets a particular report (
   // accesion no. formatting
   const n_long =  accesionNo.slice(-6);
   const n_short =  accesionNo.slice(-8, -6);
-  const acceptionAddress = `${BASE_URL}/data/${cik}/${accesionNo}/${accesionNo.slice(0,10)}-${n_short}-${n_long}-index.html`;
+  const acceptionAddress = `${BASE_DATA_URL}${cik}/${accesionNo}/${accesionNo.slice(0,10)}-${n_short}-${n_long}-index.html`;
   await page.goto(acceptionAddress, { waitUntil: "domcontentloaded" }, { timeout: 0 });
 
   // get accession filename
@@ -131,7 +127,7 @@ async function check_get_report(reportData, page){ // gets a particular report (
   if(!report_filename.doc) return {error:'No 10-K'};
 
   report_filename.doc = report_filename.doc.split('.')[0]+'.htm'; //clean URL
-  const reportURL = `${BASE_URL}/data/${cik}/${accesionNo}/${report_filename.doc}`;
+  const reportURL = `${BASE_DATA_URL}${cik}/${accesionNo}/${report_filename.doc}`;
 
   return {reportURL, year:report_filename.year, type:report_filename.type, date:report_filename.date};
   
@@ -162,7 +158,8 @@ async function getLastAnnualFromDB(cik){
 }
 
 async function getDocNumber(oo){
-  if(!sql) sql = global.sqlconn;
+  if(global?.appdata) BASE_DATA_URL = global?.appdata.SEC_BASEURL;
+  if(!sql) sql = global.appdata.sqlconn;
   let {cik, year, type} = oo;  
   if(!type) type='annual';
   if(!['annual', 'quarterly'].includes(type)) return console.error('getDocNumber no type');
@@ -184,7 +181,7 @@ async function getDocNumber(oo){
     'accept': '*/*',
     'accept-language': 'en-US,en;q=0.9',
   })
-  await page.goto(`${BASE_URL}/data/${cik}`, { waitUntil: "domcontentloaded" }, { timeout: 0 });
+  await page.goto(`${BASE_DATA_URL}${cik}`, { waitUntil: "domcontentloaded" }, { timeout: 0 });
   
   // ---------------- START LOOKING FOR LAST 10K ---------------- \\
 
@@ -213,7 +210,7 @@ async function getDocNumber(oo){
   for(let i=0; i<allAccessions.length; i++){
     if(i%9 === 0) await sleep(1000); //rate limiting for SEC;
     let accession = allAccessions[i];
-    await page.goto(`${BASE_URL}/data/${cik}/${accession}`, { waitUntil: "domcontentloaded" }, { timeout: 0 });
+    await page.goto(`${BASE_DATA_URL}${cik}/${accession}`, { waitUntil: "domcontentloaded" }, { timeout: 0 });
     let string_res_2 =  await page.evaluate(() => {
       function getDocs(document){
         return Array.from(document.querySelectorAll('td > a')).map(x => x.innerText).slice(0,150);

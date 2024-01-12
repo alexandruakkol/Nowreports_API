@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import sql from 'mssql';
-import { startServer } from './webserver.js';
 import {startFilingsDownload} from './DLfilings.js';
+import { startServer } from './webserver.js';
 
 dotenv.config();
 
@@ -11,7 +11,10 @@ async function start(){
         await sql.connect(process.env.DBCONNSTR);
         const result = await sql.query`select 1;`;
         if(result.rowsAffected?.[0] == 1) console.log('Azure DB conn OK');
-        global.sqlconn = sql;
+        //--------------- GLOBALS ---------------
+        global.appdata={};
+        global.appdata.sqlconn = sql;
+        global.appdata.SEC_BASEURL = 'https://www.sec.gov/Archives/edgar/data/';
         //--------------- MODULE START ---------------
         startServer();
         //--------------- CUSTOM APPS ---------------

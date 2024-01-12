@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import company_tickers from './company_tickers.json' assert { type: 'json' };
+import {DBcall} from './DBops.js';
 import Fuse from 'fuse.js';
 import { getDocNumber } from './server.js';
 import fs from 'fs';    
@@ -67,6 +67,18 @@ app.get('/companies', (req, res) => {
     res.json(lookupRes);
 });
 
+app.get('/conversations/:convoID', async (req, res) => {
+    const db_res = await DBcall('db_getConvo', req.params);
+    if(db_res.error) return clientError(res);
+    res.json(db_res.recordsets);
+});
+
+app.post('/conversations', async (req, res) => {
+    const db_res = await DBcall('db_insertConvo', req.body);
+    if(db_res.error || !db_res?.rowsAffected?.[0]) return clientError(res);
+    res.json({convoID:req.body.convoID});
+});
+
 app.post('/createAccount', async (req, res) => {
     function incompleteRequest(){
         res.statusCode = 400;
@@ -118,21 +130,26 @@ app.get('/links', async (req, res) => {
 
 app.get('/test', async (req, res) => {
     const file = fs.readFileSync('./payx2.txt');
-    console.log(file.toString())
+    console.log(file.toString());
     res.send(file);
 });
 
-app.post('/reports', async (req, res) => {
-    const {link} = req.body;
-    console.log('getting report for '+link);
+app.get('/lastreport/:cik', async (req, res) => {
     const headers = {'User-Agent':'PostmanRuntime/7.36.0'};
+    const db_res = await DBcall('db_getReport', req.params);
+    if(!db_res?.recordset?.[0]?.addr) return clientError(res, 'No report found');
+    const link = `${global.appdata.SEC_BASEURL}${db_res.recordset[0].addr}`
     const sec_res = await axios.get(link, {headers}).catch(err => console.log(err));
-    console.log(sec_res)
     res.send(sec_res?.data);
 });
 
+app.post('/messages', async (req, res) => {
+    const db_res = await DBcall('db_sendMessage', req.body);
+    res.send();
+});
+
 async function startServer(){
-    sql = global.sqlconn;
+    sql = global.appdata.sqlconn;
     const companies = (await db_getAllCompanies().catch(err=>console.log(err))).recordsets[0];
     await makeFuse(companies);
 

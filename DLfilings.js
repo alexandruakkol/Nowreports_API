@@ -2,15 +2,15 @@ import {getDocNumber, sendErrorCIKToDB} from './server.js';
 
 async function startFilingsDownload(oo){
     let toDL_list;
-    const sql = global.sqlconn;
-    if(oo.mode == 'update') toDL_list = (await sql.query(`select cik from companies where c.country='United States' order by mcap desc`))?.recordset;
-    if(oo.mode.startsWith('append') ) toDL_list = (await sql.query(`
+    const sql = global.appdata.sqlconn;
+    if(oo.mode == 'update') toDL_list = (await sql.query(`select cik from companies where country='United States' order by mcap desc`))?.recordset;
+    if(oo.mode.startsWith('append') ) toDL_list = (await sql.query(`   
         select c.cik 
         from companies c
-        left join filings f on (f.cik=c.cik and f.year >= datepart(year, getdate())-1 )
+        left join filings f on (f.cik=c.cik and (f.year >= datepart(year, getdate())-1 or year is null))
         where f.cik is null and c.country='United States'
         order by mcap desc
-        `))?.recordset;
+    `))?.recordset;
         
     toDL_list = toDL_list.map(x=>x.cik);
 
