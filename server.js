@@ -1,16 +1,13 @@
-import axios from 'axios';
 import company_tickers from './company_tickers.json' assert { type: 'json' };
 import Fuse from 'fuse.js';
 import puppeteer from 'puppeteer';
 import dotenv from 'dotenv';
 import fs from 'fs';
+import {sql, DBcall} from './DBOps.js';
 
 dotenv.config();
-let BASE_DATA_URL;
-
-let sql;
 const PUP_BROWSER_CONFIG = {headless: 'new'};
-
+let BASE_DATA_URL;
 //////////////////////// ======= DEV MODE ======== \\\\\\\\\\\\\\\\\\\\\\\\
 
 const distro = getEnvironment();
@@ -60,18 +57,6 @@ function getEnvironment(){
 
 //////////////////////// ======= PROGRAM ======== \\\\\\\\\\\\\\\\\\\\\\\\
 
-async function sendDatapointsToDB(oo, cik){
-  const {reportURL, year, date, type} = oo;
-  if(!reportURL) return console.error('sendDatapointsToDB : No reportURL');
-  const request = new sql.Request();
-  request.input('cik', sql.NVarChar(100), cik);
-  request.input('addr', sql.NVarChar(200), reportURL.replace('https://www.sec.gov/Archives/edgar/data/',''));
-  request.input('year', sql.SmallInt, year);
-  request.input('repDate', sql.Date, date);
-  request.input('typ', sql.NVarChar(20), type);
-  await request.execute('dbo.updateFilings').catch(err=>console.log(err));
-}
-
 async function sendErrorCIKToDB(oo){
   const {cik, typ} = oo;
   if(!cik?.length) return console.error('sendErrorCIKToDB : No CIK');
@@ -116,50 +101,31 @@ async function check_get_report(reportData, page){ // gets a particular report (
     const reportDate = document.querySelector("#formDiv > div.formContent > div:nth-child(2) > div.info")?.innerText;
     const reportYear = reportDate?.substring(0, 4);
     // filter by report type
-    //console.log(document.querySelectorAll('.tableFile[summary="Document Format Files"] > tbody > tr')).filter(tr => tr.children[1].textContent.startsWith('10'))
     const reportList = Array.from(document.querySelectorAll('.tableFile[summary="Document Format Files"] > tbody > tr'));
-    const reportRow = reportList.filter(tr => tr.children[1].textContent.includes('10-K'))[0];
+    const typeRow = reportList.filter(tr => tr.children[1].textContent.includes('10-K'))[0];
 
-    return JSON.stringify({year:reportYear, doc:reportRow?.children[2]?.innerText, type:reportRow?.children[1]?.textContent, date:reportDate});
+    let reportRow;
+    if(typeRow) reportRow = reportList.filter(tr => tr.children[1].textContent.includes('text file'))[0];
+
+    return JSON.stringify({year:reportYear, doc:reportRow?.children[2]?.innerText, type:typeRow?.children[1]?.textContent, date:reportDate});
   });
   report_filename = JSON.parse(report_filename);
-  //console.log(accesionNo, {report_filename})
   if(!report_filename.doc) return {error:'No 10-K'};
 
-  report_filename.doc = report_filename.doc.split('.')[0]+'.htm'; //clean URL
+  report_filename.doc = report_filename.doc.split('.')[0]+'.txt'; //clean URL
   const reportURL = `${BASE_DATA_URL}${cik}/${accesionNo}/${report_filename.doc}`;
 
   return {reportURL, year:report_filename.year, type:report_filename.type, date:report_filename.date};
-  
-  await page.goto(reportURL, { waitUntil: "domcontentloaded" }, { timeout: 0 });
-  let report = await page.evaluate(()=>{return document.querySelector('body').innerHTML});
-
-  //this actually gets the report
-  // // get accession filename
-  // let report_filename = await page.evaluate(()=>{
-  //   // filter only 10-Q's from the list of filed files
-  //   const reportRow = Array.from(document.querySelectorAll('.tableFile[summary="Document Format Files"] > tbody > tr')).filter(tr => tr.children[1].textContent === '10-Q')[0];
-  //   return reportRow.children[2].innerText;
-  // });
-  // report_filename = report_filename.split('.')[0]+'.htm'; //clean iXBRL after
-  // const reportURL = `${BASE_URL}/data/${cik}/${accesionNo}/${report_filename}`;
-  
-  // await page.goto(reportURL, { waitUntil: "domcontentloaded" }, { timeout: 0 });
-  // let report = await page.evaluate(()=>{return document.querySelector('body').innerHTML});
-  // console.log(report)
 }
 
 async function getLastAnnualFromDB(cik){
-  const request = new sql.Request();
-  request.input('cik', sql.NVarChar(20), cik);
-  let res = await request.execute('dbo.getAnnualReport').catch(err=>console.log(err));
-  res = res?.recordset?.[0]?.addr;
-  if(res) return BASE_DATA_URL+res;
+  const res = await DBcall('db_getReport', {cik});
+  let res_addr = res?.rows?.[0]?.addr;
+  if(res_addr) return BASE_DATA_URL + res_addr;
 }
 
-async function getDocNumber(oo){
+async function getDocNumber(oo){  // MODULE START
   if(global?.appdata) BASE_DATA_URL = global?.appdata.SEC_BASEURL;
-  if(!sql) sql = global.appdata.sqlconn;
   let {cik, year, type} = oo;  
   if(!type) type='annual';
   if(!['annual', 'quarterly'].includes(type)) return console.error('getDocNumber no type');
@@ -202,7 +168,6 @@ async function getDocNumber(oo){
 
   if(foundObj) {
     cleanup(foundObj, browser, cik);
-    console.log('1')
     return foundObj;
   }
 
@@ -223,7 +188,6 @@ async function getDocNumber(oo){
       const check_get = await check_get_report({cik, accesionNo:accession}, page);
       if(check_get?.reportURL) {
         foundObj = check_get;
-        console.log({foundObj});
         break;
       }
     }
@@ -231,14 +195,13 @@ async function getDocNumber(oo){
 
   if(foundObj) {
     cleanup(foundObj, browser, cik);
-    console.log('2')
     return foundObj;
   }
 
   // ---------------- LOOKUP UTILS ---------------- \\
   async function cleanup(foundObj, browser, cik){
     browser.close();
-    sendDatapointsToDB(foundObj, cik);
+    DBcall('db_insertFiling', {...foundObj, cik} );
   }
 
   async function checkCandidateReports(list){
@@ -250,7 +213,6 @@ async function getDocNumber(oo){
       if((Number(foundReport.year) <= Number(year)) && (foundReport.type == type)) {return foundReport;}
     }
   }
-  console.log('0 ', cik);
 }
 
 export {getDocNumber, sendErrorCIKToDB};

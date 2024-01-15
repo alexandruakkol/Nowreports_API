@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import {DBcall} from './DBops.js';
+import {DBcall, sql} from './DBops.js';
 import Fuse from 'fuse.js';
 import { getDocNumber } from './server.js';
 import fs from 'fs';    
@@ -8,7 +8,6 @@ import axios from 'axios';
 
 const PORT = 8000;
 const app = express();
-let sql;
 app.use(cors());
 app.use(express.json());
 const fuse_options = {
@@ -34,11 +33,6 @@ function generateRandomString(length) {
     }
   
     return randomString;
-}
-
-async function db_getAllCompanies(){
-    const request = new sql.Request();
-    return await request.execute('dbo.getAllCompanies');
 }
 
 function clientError(res, message=null){
@@ -68,6 +62,7 @@ app.get('/companies', (req, res) => {
 });
 
 app.get('/conversations/:convoID', async (req, res) => {
+    return
     const db_res = await DBcall('db_getConvo', req.params);
     if(db_res.error) return clientError(res);
     res.json(db_res.recordsets);
@@ -125,6 +120,7 @@ app.get('/links', async (req, res) => {
 
     if(!cik || isNaN(Number(cik))) return clientError(res, '"q" param: invalid ticker');
     const docnr = await getDocNumber({cik,year,type}).catch(err=>console.log(err));
+    
     res.json(docnr);
 });
 
@@ -137,8 +133,8 @@ app.get('/test', async (req, res) => {
 app.get('/lastreport/:cik', async (req, res) => {
     const headers = {'User-Agent':'PostmanRuntime/7.36.0'};
     const db_res = await DBcall('db_getReport', req.params);
-    if(!db_res?.recordset?.[0]?.addr) return clientError(res, 'No report found');
-    const link = `${global.appdata.SEC_BASEURL}${db_res.recordset[0].addr}`
+    if(!db_res?.rows?.[0]?.addr) return clientError(res, 'No report found');
+    const link = `${global.appdata.SEC_BASEURL}${db_res.rows[0].addr}`
     const sec_res = await axios.get(link, {headers}).catch(err => console.log(err));
     res.send(sec_res?.data);
 });
@@ -149,9 +145,9 @@ app.post('/messages', async (req, res) => {
 });
 
 async function startServer(){
-    sql = global.appdata.sqlconn;
-    const companies = (await db_getAllCompanies().catch(err=>console.log(err))).recordsets[0];
-    await makeFuse(companies);
+    //const companies = (await db_getAllCompanies().catch(err=>console.log(err))).recordsets[0];
+    const companies = await DBcall('db_getAllCompanies');
+    await makeFuse(companies.rows);
 
     app.listen(PORT, () => {
         console.log('Listening on ' + PORT);
