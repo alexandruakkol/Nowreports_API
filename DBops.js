@@ -75,7 +75,7 @@ const db_ops = {
 
     db_insertFiling: {
         fn: async (oo) => {
-            const {cik, reportURL, year, date, type} = oo;
+            const {cik, reportURL, year, date, typ} = oo;
             const query = {
                 text: `CALL insert_filing (
                     $1::character varying, 
@@ -89,12 +89,12 @@ const db_ops = {
                     reportURL.replace('https://www.sec.gov/Archives/edgar/data/',''),
                     year,
                     date,
-                    type
+                    typ
                 ],
             }
             await sql.query(query).catch(err => console.log(err));
             },
-        required_params: ['cik', 'reportURL', 'year', 'date', 'type']
+        required_params: ['cik', 'reportURL', 'year', 'date', 'typ']
     },
 
     db_template : {

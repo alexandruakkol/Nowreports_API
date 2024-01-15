@@ -115,7 +115,7 @@ async function check_get_report(reportData, page){ // gets a particular report (
   report_filename.doc = report_filename.doc.split('.')[0]+'.txt'; //clean URL
   const reportURL = `${BASE_DATA_URL}${cik}/${accesionNo}/${report_filename.doc}`;
 
-  return {reportURL, year:report_filename.year, type:report_filename.type, date:report_filename.date};
+  return {reportURL, year:report_filename.year, typ:report_filename.type, date:report_filename.date};
 }
 
 async function getLastAnnualFromDB(cik){
@@ -201,6 +201,7 @@ async function getDocNumber(oo){  // MODULE START
   // ---------------- LOOKUP UTILS ---------------- \\
   async function cleanup(foundObj, browser, cik){
     browser.close();
+    console.log({foundObj})
     DBcall('db_insertFiling', {...foundObj, cik} );
   }
 
