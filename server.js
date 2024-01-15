@@ -3,7 +3,7 @@ import Fuse from 'fuse.js';
 import puppeteer from 'puppeteer';
 import dotenv from 'dotenv';
 import fs from 'fs';
-import {sql, DBcall} from './DBOps.js';
+import {sql, DBcall} from './DBops.js';
 
 dotenv.config();
 const PUP_BROWSER_CONFIG = {headless: 'new'};
