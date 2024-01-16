@@ -25,8 +25,8 @@ async function startFilingsDownload(oo){
             await getDocNumber({cik, type:'annual'});
         }
         catch(err){
-            console.log(err);
-            DBcall('db_insertFiling', {cik, typ:'10-K', reportURL:'', year: '', date:''} );
+            console.log('COULD NOT PULL CIK ', cik, err);
+            //DBcall('db_insertFiling', {cik, typ:'10-K', reportURL:'', date:''} );
         }
         console.log('pulled ', cik);
     }
