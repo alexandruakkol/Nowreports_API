@@ -125,6 +125,7 @@ async function getLastAnnualFromDB(cik){
 }
 
 async function getDocNumber(oo){  // MODULE START
+  
   if(global?.appdata) BASE_DATA_URL = global?.appdata.SEC_BASEURL;
   let {cik, year, type} = oo;  
   if(!type) type='annual';
@@ -140,79 +141,86 @@ async function getDocNumber(oo){  // MODULE START
   }
 
   const browser = await puppeteer.launch(PUP_BROWSER_CONFIG);
-  const page = await browser.newPage();
-  await page.setExtraHTTPHeaders({   
-    'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36',
-    'content-type': 'text/plain;charset=UTF-8',
-    'accept': '*/*',
-    'accept-language': 'en-US,en;q=0.9',
-  })
-  await page.goto(`${BASE_DATA_URL}${cik}`, { waitUntil: "domcontentloaded" }, { timeout: 0 });
+
+  try{
+    const page = await browser.newPage();
+    await page.setExtraHTTPHeaders({   
+      'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36',
+      'content-type': 'text/plain;charset=UTF-8',
+      'accept': '*/*',
+      'accept-language': 'en-US,en;q=0.9',
+    })
+    await page.goto(`${BASE_DATA_URL}${cik}`, { waitUntil: "domcontentloaded" }, { timeout: 0 });
+    
+    // ---------------- START LOOKING FOR LAST 10K ---------------- \\
   
-  // ---------------- START LOOKING FOR LAST 10K ---------------- \\
-
-  // ---------------- ATTEMPT 1 ---------------- \\ look at the ones with 0
-  let string_res_1 = await page.evaluate(() => {
-    function getAccessions(document){
-      return Array.from(document.querySelectorAll('td > a')).map(x => x.innerText).slice(0,300);
-    }
-    const allAccessions = getAccessions(document);
-    const reports = allAccessions.filter(e => e[3] === '0'); // filter accessions for reports only
-    return JSON.stringify({reports, allAccessions});
-  });
-  let {reports, allAccessions} = JSON.parse(string_res_1);
-  // here I have a list of top X filings, in reportsList, as directory IDs.
-
-  //first, check if the list of 0 codes has any 10-ks
-  let foundObj = await checkCandidateReports(reports);
-
-  if(foundObj) {
-    cleanup(foundObj, browser, cik);
-    return foundObj;
-  }
-
-  // ---------------- ATTEMPT 2 ---------------- \\ if not, check each report one by one
-  for(let i=0; i<allAccessions.length; i++){
-    if(i%9 === 0) await sleep(1000); //rate limiting for SEC;
-    let accession = allAccessions[i];
-    await page.goto(`${BASE_DATA_URL}${cik}/${accession}`, { waitUntil: "domcontentloaded" }, { timeout: 0 });
-    let string_res_2 =  await page.evaluate(() => {
-      function getDocs(document){
-        return Array.from(document.querySelectorAll('td > a')).map(x => x.innerText).slice(0,150);
+    // ---------------- ATTEMPT 1 ---------------- \\ look at the ones with 0
+    let string_res_1 = await page.evaluate(() => {
+      function getAccessions(document){
+        return Array.from(document.querySelectorAll('td > a')).map(x => x.innerText).slice(0,300);
       }
-      const docs = getDocs(document);
-      return docs;
+      const allAccessions = getAccessions(document);
+      const reports = allAccessions.filter(e => e[3] === '0'); // filter accessions for reports only
+      return JSON.stringify({reports, allAccessions});
     });
-
-    if(string_res_2.length > 8){
-      const check_get = await check_get_report({cik, accesionNo:accession}, page);
-      if(check_get?.reportURL) {
-        foundObj = check_get;
-        break;
+    let {reports, allAccessions} = JSON.parse(string_res_1);
+    // here I have a list of top X filings, in reportsList, as directory IDs.
+  
+    // //first, check if the list of 0 codes has any 10-ks
+    //let foundObj = await checkCandidateReports(reports);
+    let foundObj;
+    // if(foundObj) {
+    //   cleanup(foundObj, browser, cik);
+    //   return foundObj;
+    // }
+  
+    // ---------------- ATTEMPT 2 ---------------- \\ if not, check each report one by one
+    for(let i=0; i<allAccessions.length; i++){
+      if(i%9 === 0) await sleep(1000); //rate limiting for SEC;
+      let accession = allAccessions[i];
+      await page.goto(`${BASE_DATA_URL}${cik}/${accession}`, { waitUntil: "domcontentloaded" }, { timeout: 0 });
+      let string_res_2 =  await page.evaluate(() => {
+        function getDocs(document){
+          return Array.from(document.querySelectorAll('td > a')).map(x => x.innerText).slice(0,150);
+        }
+        const docs = getDocs(document);
+        return docs;
+      });
+  
+      if(string_res_2.length > 8){
+        const check_get = await check_get_report({cik, accesionNo:accession}, page);
+        if(check_get?.reportURL) {
+          foundObj = check_get;
+          break;
+        }
+      }
+    }
+  
+    if(foundObj) {
+      cleanup(foundObj, browser, cik);
+      return foundObj;
+    }
+  
+    // ---------------- LOOKUP UTILS ---------------- \\
+    async function cleanup(foundObj, browser, cik){
+      browser.close();
+      console.log({foundObj})
+      DBcall('db_insertFiling', {...foundObj, cik} );
+    }
+  
+    async function checkCandidateReports(list){
+      //TODO: remove slice
+      for(let i=0; i<list.length; i++){
+        if(i%9 === 0) await sleep(1000); //rate limiting for SEC;
+        const foundReport = await check_get_report({cik, accesionNo:list[i], year, type}, page);
+        if(!foundReport) continue;
+        if((Number(foundReport.year) <= Number(year)) && (foundReport.type == type)) {return foundReport;}
       }
     }
   }
-
-  if(foundObj) {
-    cleanup(foundObj, browser, cik);
-    return foundObj;
-  }
-
-  // ---------------- LOOKUP UTILS ---------------- \\
-  async function cleanup(foundObj, browser, cik){
-    browser.close();
-    console.log({foundObj})
-    DBcall('db_insertFiling', {...foundObj, cik} );
-  }
-
-  async function checkCandidateReports(list){
-    //TODO: remove slice
-    for(let i=0; i<list.length; i++){
-      if(i%9 === 0) await sleep(1000); //rate limiting for SEC;
-      const foundReport = await check_get_report({cik, accesionNo:list[i], year, type}, page);
-      if(!foundReport) continue;
-      if((Number(foundReport.year) <= Number(year)) && (foundReport.type == type)) {return foundReport;}
-    }
+  catch(err){
+    await browser.close(); // so that browser never hangs
+    throw new Error(err);
   }
 }
 
