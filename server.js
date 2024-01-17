@@ -141,9 +141,10 @@ async function getDocNumber(oo){  // MODULE START
   }
 
   const browser = await puppeteer.launch(PUP_BROWSER_CONFIG);
+  const context = await browser.createIncognitoBrowserContext();
 
   try{
-    const page = await browser.newPage();
+    const page = await context.newPage();
     await page.setExtraHTTPHeaders({   
       'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36',
       'content-type': 'text/plain;charset=UTF-8',
