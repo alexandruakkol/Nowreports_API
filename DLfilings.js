@@ -1,6 +1,7 @@
 import {getDocNumber, sendErrorCIKToDB} from './server.js';
 import {sql, DBcall} from './DBops.js';
-const { exec } = require('child_process');
+import Childprocess from 'child_process';
+const {exec} = Childprocess;
 
 async function startFilingsDownload(oo){
     let toDL_list;
