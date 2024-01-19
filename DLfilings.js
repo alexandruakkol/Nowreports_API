@@ -23,7 +23,7 @@ async function startFilingsDownload(oo){
 
     for(const cik of toDL_list){
         console.log('pulling ', cik);
-        cleanupCounter = 0;
+        let cleanupCounter = 0;
         try{
             await getDocNumber({cik, type:'annual'});
         }
