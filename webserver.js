@@ -75,6 +75,7 @@ app.post('/conversations', async (req, res) => {
 });
 
 app.post('/createAccount', async (req, res) => {
+    return
     function incompleteRequest(){
         res.statusCode = 400;
         res.json({error:'incomplete request'});

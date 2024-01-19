@@ -205,7 +205,6 @@ async function getDocNumber(oo){  // MODULE START
     // ---------------- LOOKUP UTILS ---------------- \\
     async function cleanup(foundObj, browser, cik){
       browser.close();
-      console.log({foundObj})
       DBcall('db_insertFiling', {...foundObj, cik} );
     }
   

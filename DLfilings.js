@@ -1,5 +1,6 @@
 import {getDocNumber, sendErrorCIKToDB} from './server.js';
 import {sql, DBcall} from './DBops.js';
+const { exec } = require('child_process');
 
 async function startFilingsDownload(oo){
     let toDL_list;
@@ -21,12 +22,31 @@ async function startFilingsDownload(oo){
 
     for(const cik of toDL_list){
         console.log('pulling ', cik);
+        cleanupCounter = 0;
         try{
             await getDocNumber({cik, type:'annual'});
         }
         catch(err){
             console.log('COULD NOT PULL CIK ', cik, err);
             //DBcall('db_insertFiling', {cik, typ:'10-K', reportURL:'', date:''} );
+        } finally{
+            if(process.env.NODE_ENV === 'production') {
+                cleanupCounter++;
+                if(cleanupCounter === 10) {
+                    const command = `rm -rf ~/snap/chromium/common/chromium/DeferredBrowserMetrics/*`;
+                    exec(command, (error, stdout, stderr) => {
+                        if (error) {
+                            console.error(`browser cleanup error: ${error.message}`);
+                            return;
+                        }
+                        if (stderr) {
+                            console.error(`browser cleanup stderr: ${stderr}`);
+                            return;
+                        }
+                    });
+                }
+
+            }
         }
         console.log('pulled ', cik);
     }
