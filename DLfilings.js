@@ -6,13 +6,14 @@ const {exec} = Childprocess;
 async function startFilingsDownload(oo){
     let toDL_list;
 
-    if(oo.mode == 'update') toDL_list = (await sql.query(`select cik from companies where country='United States' order by mcap desc`))?.rows;
+    if(oo.mode == 'update') toDL_list = (await sql.query(`select cik from companies where country='United States' order by mcap desc limit 50`))?.rows;
     if(oo.mode.startsWith('append') ) toDL_list = (await sql.query(`   
        select c.cik 
         from companies c
         left join filings f on (f.cik=c.cik)
         where f.cik is null and c.country='United States'
         order by mcap desc
+        limit 50
     `))?.rows;
 
     toDL_list = toDL_list.map(x => x.cik);
@@ -30,7 +31,7 @@ async function startFilingsDownload(oo){
         catch(err){
             console.log('COULD NOT PULL CIK ', cik, err);
             //DBcall('db_insertFiling', {cik, typ:'10-K', reportURL:'', date:''} );
-        } finally{
+        } finally {
             if(process.env.NODE_ENV === 'production') {
                 cleanupCounter++;
                 if(cleanupCounter === 10) {
@@ -47,11 +48,12 @@ async function startFilingsDownload(oo){
                         }
                     });
                 }
-
             }
         }
         console.log('pulled ', cik);
     }
+    console.log('-----Scheduled restart-----')
+    process.exit();
 }
 
 export {startFilingsDownload};
