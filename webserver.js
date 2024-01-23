@@ -11,7 +11,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 const fuse_options = {
-    keys: ['symbol', 'name']
+    keys: ['symbol', 'name', 'chunks']
 };
 let fuse;
 
@@ -62,19 +62,18 @@ app.get('/companies', (req, res) => {
 });
 
 app.get('/conversations/:convoID', async (req, res) => {
-    return
     const db_res = await DBcall('db_getConvo', req.params);
-    if(db_res.error) return clientError(res);
-    res.json(db_res.recordsets);
+    if(db_res?.error) return clientError(res);
+    res.json(db_res);
 });
 
 app.post('/conversations', async (req, res) => {
     const db_res = await DBcall('db_insertConvo', req.body);
-    if(db_res.error || !db_res?.rowsAffected?.[0]) return clientError(res);
+    if(db_res?.error || !db_res?.rowCount) return clientError(res);
     res.json({convoID:req.body.convoID});
 });
 
-app.post('/createAccount', async (req, res) => {
+app.post('/createAccount', async (req, res) => { //TODO 
     return
     function incompleteRequest(){
         res.statusCode = 400;
@@ -98,17 +97,10 @@ app.post('/createAccount', async (req, res) => {
 });
 
 app.get('/users/:uid', async (req, res) => {
-    const {uid} = req.params;
-    const request = new sql.Request();
-    request.input('uid', sql.NVarChar(100), uid);
-    try{
-        const data = await request.execute('dbo.getUserDetails');
-        res.json(data);
-    } catch(err){
-        console.log(err);
-        res.statusCode=500;
-        res.json();
-    }
+    console.log(req.params)
+    const db_res = await DBcall('db_getUser', req.params);
+    if(db_res.error) return clientError(res);
+    res.json(db_res.rows[0]);
 });
 
 app.get('/links', async (req, res) => {
@@ -132,12 +124,25 @@ app.get('/test', async (req, res) => {
 });
 
 app.get('/lastreport/:cik', async (req, res) => {
+    function trim_xml(xmltext){
+        xmltext = xmltext
+            .replaceAll('<script', '<div hidden=true')
+            .replaceAll('</script', '</div')
+            .replaceAll('xmlns', '')
+            .replaceAll('<img','<div hidden=true')
+
+        const regex = /<DOCUMENT>(.*?)<\/DOCUMENT>/gs;
+        const match = regex.exec(xmltext);
+    
+        return match ? match[1] : null;
+    }
     const headers = {'User-Agent':'PostmanRuntime/7.36.0'};
     const db_res = await DBcall('db_getReport', req.params);
     if(!db_res?.rows?.[0]?.addr) return clientError(res, 'No report found');
     const link = `${global.appdata.SEC_BASEURL}${db_res.rows[0].addr}`
     const sec_res = await axios.get(link, {headers}).catch(err => console.log(err));
-    res.send(sec_res?.data);
+    const trimmed_xml = trim_xml(sec_res?.data)
+    res.send(trimmed_xml);
 });
 
 app.post('/messages', async (req, res) => {
