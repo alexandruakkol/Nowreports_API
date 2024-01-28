@@ -5,11 +5,14 @@ import Fuse from 'fuse.js';
 import { getDocNumber } from './server.js';
 import fs from 'fs';    
 import axios from 'axios';
+import {exponentialBackoff} from './utils.js';
+import compression from 'compression';
 
 const PORT = 8000;
 const app = express();
 app.use(cors());
 app.use(express.json());
+
 const fuse_options = {
     keys: ['symbol', 'name', 'chunks']
 };
@@ -123,9 +126,10 @@ app.get('/test', async (req, res) => {
     res.send(file);
 });
 
-app.get('/lastreport/:cik', async (req, res) => {
+app.get('/lastreport/:cik', compression() ,async (req, res) => {
     function trim_xml(xmltext){
-        xmltext = xmltext
+        if(req.query?.full) return xmltext;
+        xmltext = xmltext 
             .replaceAll('<script', '<div hidden=true')
             .replaceAll('</script', '</div')
             .replaceAll('xmlns', '')
@@ -139,9 +143,9 @@ app.get('/lastreport/:cik', async (req, res) => {
     const headers = {'User-Agent':'PostmanRuntime/7.36.0'};
     const db_res = await DBcall('db_getReport', req.params);
     if(!db_res?.rows?.[0]?.addr) return clientError(res, 'No report found');
-    const link = `${global.appdata.SEC_BASEURL}${db_res.rows[0].addr}`
-    const sec_res = await axios.get(link, {headers}).catch(err => console.log(err));
-    const trimmed_xml = trim_xml(sec_res?.data)
+    const link = `${global.appdata.SEC_BASEURL}${db_res.rows[0].addr}`;
+    const sec_res = await exponentialBackoff(() => axios.get(link, {headers}), 6, 300);
+    const trimmed_xml = trim_xml(sec_res?.data);
     res.send(trimmed_xml);
 });
 
