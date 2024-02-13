@@ -34,7 +34,7 @@ async function startFilingsDownload(oo){
         } finally {
             if(process.env.NODE_ENV === 'production') {
                 cleanupCounter++;
-                if(cleanupCounter === 10) {
+                if(cleanupCounter === 5) {
                     cleanupCounter = 0;
                     const command = `rm -rf ~/snap/chromium/common/chromium/DeferredBrowserMetrics/*`;
                     exec(command, (error, stdout, stderr) => {

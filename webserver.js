@@ -7,11 +7,26 @@ import fs from 'fs';
 import axios from 'axios';
 import {exponentialBackoff} from './utils.js';
 import compression from 'compression';
+import { v4 as uuidv4 } from 'uuid';
+import { TargetType } from 'puppeteer';
+import cookieParser from "cookie-parser";
+import admin from 'firebase-admin';
+import fb_creds from './fb_creds.json' assert { type: 'json' };
+
+admin.initializeApp({
+    credential: admin.credential.cert(fb_creds)
+});
 
 const PORT = 8000;
 const app = express();
-app.use(cors());
+
+let corsOptions = {
+    origin : ['http://localhost:3000'],
+    credentials:true
+}
+app.use(cors(corsOptions));
 app.use(express.json());
+app.use(cookieParser());
 
 const fuse_options = {
     keys: ['symbol', 'name', 'chunks']
@@ -43,6 +58,33 @@ function clientError(res, message=null){
     res.json(message && message);
 }
 
+function unauthorizedError(res, message=null){
+    console.log('unauth error')
+    res.statusCode = 401;
+    res.json(message && message);
+}
+
+function genExpirationDate(oo){
+    let expdate = new Date();
+    expdate.setMonth(expdate.getMonth() + oo.month);
+    return expdate;
+}
+
+async function getAPITokenByUID(uid){
+    let resp = await DBcall('db_get_apitoken_by_uid', {uid});
+    return resp?.rows?.[0];
+}
+
+async function verifyAPIToken(apitoken){
+    let resp = await DBcall('db_verify_apitoken', {apitoken});
+    console.log({resp});
+    return resp?.rows?.[0];
+}
+
+async function creditAccount(uid){
+    DBcall('db_credit_account', uid);
+}
+
 function CIKlookup(companyName, options){
     console.log(`== CIK lookup for ${companyName} ==`);
 
@@ -58,6 +100,34 @@ function CIKlookup(companyName, options){
     }
     return processed_res;
 }
+
+function authenticateToken(req, res, next) {
+    const token = req?.cookies?.['AuthToken']; // Extract the token from the cookie
+    if (!token) return res.sendStatus(401); // Unauthorized if there's no token
+
+    verifyAPIToken(token).then(uid => {
+        console.log('verified apitoken', uid, {token});
+        if(!uid) throw new Error('Invalid apitoken');
+        req.uid=uid;
+        next();
+    }).catch(err => {
+        console.log('authenticateToken err:', err)
+        res.sendStatus(403);
+    });
+}
+
+
+const decodeFirebaseJWST = async (req, res, next) => {
+    const token = req.headers.authorization?.split('Bearer ')[1];
+    try {
+        const decodedToken = await admin.auth().verifyIdToken(token);
+        req.user = decodedToken;
+        next();
+    } catch (error) {
+        console.log('decodeFirebaseJWST error: ', error)
+        res.status(401).send('Unauthorized');
+    }
+};
 
 app.get('/companies', (req, res) => {  
     const lookupRes = CIKlookup(req.query.q);
@@ -99,11 +169,39 @@ app.post('/createAccount', async (req, res) => { //TODO
     res.json();
 });
 
-app.get('/users/:uid', async (req, res) => {
-    console.log(req.params)
-    const db_res = await DBcall('db_getUser', req.params);
+app.post('/login', decodeFirebaseJWST, async (req, res) => {
+    const uid = req?.user?.uid;
+    if(!uid) throw new Error('no UID');
+    // ---------- DB verify user ---------- \\
+    const db_res = await DBcall('db_getUser', {uid});
     if(db_res.error) return clientError(res);
-    res.json(db_res.rows[0]);
+
+    // ---------- DB verify token ---------- \\
+    let apitoken_data = await getAPITokenByUID(uid);
+    if(!apitoken_data){
+        // ---------- DB write token ---------- \\
+
+        const newtoken_input = {
+            uid,
+            apitoken: uuidv4(), 
+            exptime: genExpirationDate({month:1}), 
+            credits: 3 // TODO: delete
+        }
+
+        const newtoken_res = await DBcall('db_write_apitoken', newtoken_input);
+        if(newtoken_res.error) return clientError(res);
+        apitoken_data = await getAPITokenByUID(uid);
+    }                             
+    if(!apitoken_data?.apitoken) return unauthorizedError(res, 'Could not get API token. Try again');
+    
+    res.cookie('AuthToken', apitoken_data.apitoken, {
+        // //httpOnly: true,
+        // secure: false, // TODO: Set to true in production to send the cookie over HTTPS only
+        // sameSite: 'None', //TODO: security check
+        maxAge: 3600000,
+    });
+
+    res.json({...db_res.rows[0], ...apitoken_data});
 });
 
 app.get('/links', async (req, res) => {
@@ -126,7 +224,7 @@ app.get('/test', async (req, res) => {
     res.send(file);
 });
 
-app.get('/lastreport/:cik', compression() ,async (req, res) => {
+app.get('/lastreport/:cik', compression(), async (req, res) => {
     function trim_xml(xmltext){
         if(req.query?.full) return xmltext;
         xmltext = xmltext 
@@ -150,8 +248,22 @@ app.get('/lastreport/:cik', compression() ,async (req, res) => {
 });
 
 app.post('/messages', async (req, res) => {
-    const db_res = await DBcall('db_sendMessage', req.body);
+    //const db_res = await DBcall('db_sendMessage', req.body);
     res.send();
+});
+
+app.post('/completionproxy', authenticateToken, async (req, res) => {
+    try{
+        const url = 'http://127.0.0.1:5001/completion';
+        const data = {messages:req.body.messages, filingID:req.body.filingID};
+        const config = {'Content-Type':'application/json', responseType:'stream'};
+        const py_response = await axios.post(url, data, config);
+        if(py_response.status === 200) creditAccount(req.uid);
+        py_response.data.pipe(res);
+    } catch (error) {
+        console.error('Error proxying ai stream request:', error);
+        res.status(500).send('Failed to proxy ai stream.');
+    }
 });
 
 async function startServer(){

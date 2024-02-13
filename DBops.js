@@ -20,9 +20,12 @@ const db_ops = {
     db_getAllCompanies : {
         fn: async () => {
             const query = {
-                text:'SELECT id, symbol, cik, country, mcap from companies',
+                text:`SELECT symbol, c.cik, country, mcap, f.chunks
+                    from companies c
+                    join filings f on c.cik=f.cik
+                    order by case when chunks is null then 0 else chunks end desc`,
                 values:[]
-            }    
+            }
             return await sql.query(query);
         },
         required_params: [],
@@ -30,23 +33,35 @@ const db_ops = {
     db_insertConvo : {
         fn: async (oo) => {
             const {convoID, uid, ticker} = oo;
-            const request = new sql.Request();
-            request.input('convoID', sql.NVarChar(40), convoID);
-            request.input('uid', sql.NVarChar(100), uid);
-            request.input('symbol', sql.NVarChar(100), ticker);
-            return await request.execute('dbo.insertConversation');
+            let query = {
+                text:`
+                INSERT INTO conversations (convoID, uid, symbol)
+                SELECT $1, $2, $3`,
+                values: [convoID, uid, ticker]
+            }
+            return await sql.query(query);
         },
         required_params : ['convoID', 'uid', 'ticker']
     },
     db_getConvo : {
         fn: async (oo) => { //TODO: auth with uid too
-            return;
             const {convoID} = oo;
-            const query = {
-                text:'SELECT ',
-                values:[convoID]
+            const msgs_query = {
+                text: 'SELECT id, agent, convoid, msg, date from messages where convoid = $1',
+                values: [convoID]
+            }
+            const convo_query = {
+                text:`
+                    SELECT convoid, uid, c.symbol, createddate, f.typ, f.repdate, f.cik, f.id as filingid
+                    from conversations c
+                    join companies co on c.symbol=co.symbol
+                    left join filings f on f.cik=co.cik
+                    where convoID = $1;
+                    `,
+                    values:[convoID]
             }    
-            return await sql.query(query);
+            let res = [await sql.query(msgs_query), await sql.query(convo_query)];
+            return res.map(set => set?.rows || []);
         }, 
         required_params : ['convoID']
     },
@@ -61,18 +76,31 @@ const db_ops = {
         },
         required_params: ['cik'],
     },
-
+    db_getUser: {
+        fn: async (oo) => {
+            const {uid} = oo;
+            const query = {
+                text:'SELECT fname, lname, email, uid from users where uid = $1',
+                values:[uid]
+            }
+            return await sql.query(query);
+        },
+        required_params: ['uid']
+    },
     db_sendMessage : {
         fn: async (oo) => {
-            const {convoID, msg} = oo;
-            const request = new sql.Request();
-            request.input('convoID', sql.NVarChar(40), convoID);
-            request.input('msg', sql.NVarChar(500), msg);
-            return await request.execute('dbo.sendMessage');
+            const {convoID, msg, agent} = oo;
+            const query = {
+                text: `
+                    INSERT INTO messages (agent, convoID, msg)
+                    SELECT $1, $2, $3
+                `,
+                values: [agent, convoID, msg]
+            }
+            return await sql.query(query);
         },
-        required_params: ['convoID', 'msg'],
+        required_params: ['agent', 'convoID', 'msg'],
     },
-
     db_insertFiling: {
         fn: async (oo) => {
             const {cik, reportURL, year, date, typ} = oo;
@@ -97,6 +125,64 @@ const db_ops = {
         required_params: ['cik', 'reportURL', 'year', 'date', 'typ']
     },
 
+    db_get_apitoken_by_uid : {
+        fn: async (oo) => {
+            const {uid} = oo;
+            const query = {
+                text:`SELECT a.apitoken, u.credits
+                    from apitokens a
+                    join users u on u.uid=a.uid
+                    where a.uid = $1 and CURRENT_TIMESTAMP < a.exptime`,
+                values:[uid]
+            }    
+            return await sql.query(query);
+        },
+        required_params: ['uid'],
+    },
+
+    db_verify_apitoken : {
+        fn: async (oo) => {
+            const {apitoken} = oo;
+            const query = {
+                text:`SELECT u.uid, u.credits
+                    from apitokens a
+                    join users u on u.uid=a.uid
+                    where a.apitoken = $1 and CURRENT_TIMESTAMP < a.exptime`,
+                values:[apitoken]
+            }    
+            return await sql.query(query);
+        },
+        required_params: ['apitoken'],
+    },
+
+    db_credit_account : {
+        fn: async (oo) => {
+            const {uid} = oo;
+            const query = {
+                text:`
+                    UPDATE users
+                    SET credits = credits - 1
+                    WHERE uid = $1`,
+                values:[uid]
+            }    
+            return await sql.query(query);
+        },
+        required_params: ['uid'],
+    },
+
+    db_write_apitoken : {
+        fn: async (oo) => {
+            const {uid, apitoken, exptime} = oo;
+            const query = {
+                text:`INSERT INTO apitokens (uid, apitoken, exptime)
+                    VALUES ($1, $2, $3)`,
+                values:[uid, apitoken, exptime]
+            }    
+            return await sql.query(query);
+        },
+        required_params: ['uid', 'apitoken', 'exptime'],
+    },
+
     db_template : {
         fn: async (oo) => {
             const {cik} = oo;
@@ -107,7 +193,7 @@ const db_ops = {
             return await sql.query(query);
         },
         required_params: ['cik'],
-    }, 
+    },
 }
 
 //////////////////////// ======= DB methods ======== \\\\\\\\\\\\\\\\\\\\\\\\
@@ -117,8 +203,8 @@ function check_required_params(fn_obj, args){
     const fn_name = Object.keys(fn_obj)[0];
     const missing_req_params = required_params.filter(param => !Object.keys(args).includes(param));
     if(!missing_req_params.length) return;
-    if(missing_req_params.length === 1) throw new Error(`Missing parameter: ${missing_req_params[0]}`);
-    if(missing_req_params.length > 1) throw new Error(`Missing parameters: ${missing_req_params.join(', ')}`);
+    if(missing_req_params.length === 1) throw new Error(`${fn_name}: Missing parameter: ${missing_req_params[0]}`);
+    if(missing_req_params.length > 1) throw new Error(`${fn_name}: Missing parameters: ${missing_req_params.join(', ')}`);
 }
 
 async function DBcall(fn_string, args=[]){
