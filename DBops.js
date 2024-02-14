@@ -80,7 +80,14 @@ const db_ops = {
         fn: async (oo) => {
             const {uid} = oo;
             const query = {
-                text:'SELECT name, email, uid, stripe_customer_id from users where uid = $1',
+                text:`SELECT name, email, uid, stripe_customer_id, s.period_enddate as sub_exp
+                    from users u
+                    left join subscriptions s on 
+                        (u.stripe_customer_id=s.stripe_customer) 
+                        and (current_timestamp between s.period_startdate and s.period_enddate)
+                    where uid = $1 
+                    order by s.period_enddate desc
+                    limit 1`,
                 values:[uid]
             }
             return await sql.query(query);
@@ -217,6 +224,18 @@ const db_ops = {
             return await sql.query(query);
         },
         required_params: ['stripe_invoice_id', 'stripe_client', 'amount', 'created', 'currency'],
+    },
+
+    db_add_credits : {
+        fn: async (oo) => {
+            const {amount, stripe_customer_id} = oo;
+            const query = {
+                text:'UPDATE users set credits = coalesce(credits, 0) + $1 where stripe_customer_id = $2',
+                values:[amount, stripe_customer_id]
+            }    
+            return await sql.query(query);
+        },
+        required_params: ['amount', 'stripe_customer_id'],
     },
 
     db_template : {

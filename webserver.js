@@ -309,7 +309,6 @@ const st = {
         // ------------ DB INSERT SUBSCRIPTION ------------ \\
         let expires_at =  (new Date(invoice_data.created * 1000));
         expires_at = new Date(expires_at.setMonth(expires_at.getMonth() + 1)).toISOString(); //calc not to do additional stripe call to Subscriptions
-
         const db_sub_data = {
             id: invoice_data.subscription,
             stripe_customer: invoice_data.customer,
@@ -317,9 +316,14 @@ const st = {
             period_enddate: expires_at,
             invoice_id:invoice_data.invoice
         };
-
         const db_sub_insert = await DBcall('db_insert_subscription', db_sub_data);
         if(db_sub_insert.rowCount != 1) return serverError(res, 'Subscription error. Code 15'); //TODO: needs to be logged.
+        
+        // ------------ ADD CREDITS ------------ \\
+        const db_add_credits_data = {amount: 3000, stripe_customer_id: invoice_data.customer};
+        const db_add_credits_insert = await DBcall('db_add_credits', db_add_credits_data);
+        if(db_add_credits_insert.rowCount != 1) return serverError(res, 'Invoicing error. Code 16'); //TODO: needs to be logged.
+
         res.status(200).end();
     }
 }
