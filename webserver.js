@@ -12,18 +12,21 @@ import { TargetType } from 'puppeteer';
 import cookieParser from "cookie-parser";
 import admin from 'firebase-admin';
 import fb_creds from './fb_creds.json' assert { type: 'json' };
+import stripeConfig from './stripe.js';
 
 admin.initializeApp({
     credential: admin.credential.cert(fb_creds)
 });
 
+const DOMAIN = 'http://localhost:3000'
 const PORT = 8000;
 const app = express();
 
 let corsOptions = {
-    origin : ['http://localhost:3000'],
+    origin : ['http://localhost:3000', DOMAIN],
     credentials:true
 }
+
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(cookieParser());
@@ -55,6 +58,11 @@ function generateRandomString(length) {
 
 function clientError(res, message=null){
     res.statusCode = 400;
+    res.json(message && message);
+}
+
+function serverError(res, message=null){
+    res.statusCode = 500;
     res.json(message && message);
 }
 
@@ -116,8 +124,7 @@ function authenticateToken(req, res, next) {
     });
 }
 
-
-const decodeFirebaseJWST = async (req, res, next) => {
+const mid_decodeFirebaseJWST = async (req, res, next) => {
     const token = req.headers.authorization?.split('Bearer ')[1];
     try {
         const decodedToken = await admin.auth().verifyIdToken(token);
@@ -147,29 +154,17 @@ app.post('/conversations', async (req, res) => {
 });
 
 app.post('/createAccount', async (req, res) => { //TODO 
-    return
-    function incompleteRequest(){
-        res.statusCode = 400;
-        res.json({error:'incomplete request'});
-    }
-    const {uid, fname, lname, email } = req.body;
-    if(!(uid && fname && lname && email)) return incompleteRequest();
-
-    const request = new sql.Request();
-    request.input('uid', sql.NVarChar(100), uid);
-    request.input('fname', sql.NVarChar(100), fname);
-    request.input('lname', sql.NVarChar(100), lname);
-    request.input('email', sql.NVarChar(200), email);
-    try{
-        await request.execute('dbo.createAccount');
-    } catch(err){
-        console.log(err);
-        res.statusCode = 500;
-    }
-    res.json();
+    const {idtoken, name, email, stripe_customer_id} = req?.body;
+    if(!(idtoken && email && name, stripe_customer_id)) return clientError(res, 'incomplete request');
+    const verified_token = await admin.auth().verifyIdToken(idtoken);
+    const uid = verified_token.uid;
+    if(!uid) return unauthorizedError(res);
+    const db_res = await DBcall('db_create_account', {name, email, uid, stripe_customer_id});
+    if(db_res?.rowCount == 1) res.json();
+    else return serverError(res, 'Could not create account. Code 11');
 });
 
-app.post('/login', decodeFirebaseJWST, async (req, res) => {
+app.post('/login', mid_decodeFirebaseJWST, async (req, res) => {
     const uid = req?.user?.uid;
     if(!uid) throw new Error('no UID');
     // ---------- DB verify user ---------- \\
@@ -180,7 +175,6 @@ app.post('/login', decodeFirebaseJWST, async (req, res) => {
     let apitoken_data = await getAPITokenByUID(uid);
     if(!apitoken_data){
         // ---------- DB write token ---------- \\
-
         const newtoken_input = {
             uid,
             apitoken: uuidv4(), 
@@ -191,7 +185,7 @@ app.post('/login', decodeFirebaseJWST, async (req, res) => {
         const newtoken_res = await DBcall('db_write_apitoken', newtoken_input);
         if(newtoken_res.error) return clientError(res);
         apitoken_data = await getAPITokenByUID(uid);
-    }                             
+    }         
     if(!apitoken_data?.apitoken) return unauthorizedError(res, 'Could not get API token. Try again');
     
     res.cookie('AuthToken', apitoken_data.apitoken, {
@@ -266,8 +260,83 @@ app.post('/completionproxy', authenticateToken, async (req, res) => {
     }
 });
 
+stripeConfig().then(stripe => {
+    app.post('/create-checkout-session', async (req, res) => {
+        const session = await stripe.checkout.sessions.create({
+          customer:req.body.customer,
+          line_items: [
+            {
+              price: 'price_1OjBq2HAuXo1x4cNQ7b3vqL9',
+              quantity: 1,
+            },
+          ],
+          mode: 'subscription',
+          success_url: `${DOMAIN}/subscription?success=true`,
+          cancel_url: `${DOMAIN}/subscription?canceled=true`,
+        });
+      
+        res.json({url: session.url})
+    });
+
+    app.post('/create-stripe-customer', async(req, res) => {
+        const {name, email} = req.body;
+        const customer = await stripe.customers.create({name, email});
+        res.json(customer);
+    })
+})
+
+//=================================================================\\
+// ------------------------ STRIPE WEBHOOK ------------------------\\
+//=================================================================\\
+
+const st = {
+    checkout_completed: async (req, res) => {
+        const payload = req.body;
+
+        // ------------ DB INSERT INVOICE ------------ \\
+        const invoice_data = payload.data.object;
+        const created = (new Date(invoice_data.created * 1000)).toISOString();
+        const db_invoice_data = {
+            stripe_invoice_id: invoice_data.invoice,
+            stripe_client: invoice_data.customer,
+            amount: invoice_data.amount_total / 100,
+            created,
+            currency: invoice_data.currency
+        };
+        const db_invoice_insert = await DBcall('db_insert_invoice', db_invoice_data);
+        if(db_invoice_insert.rowCount != 1) return serverError(res, 'Invoicing error. Code 14'); //TODO: needs to be logged.
+    
+        // ------------ DB INSERT SUBSCRIPTION ------------ \\
+        let expires_at =  (new Date(invoice_data.created * 1000));
+        expires_at = new Date(expires_at.setMonth(expires_at.getMonth() + 1)).toISOString(); //calc not to do additional stripe call to Subscriptions
+
+        const db_sub_data = {
+            id: invoice_data.subscription,
+            stripe_customer: invoice_data.customer,
+            period_startdate: created, 
+            period_enddate: expires_at,
+            invoice_id:invoice_data.invoice
+        };
+
+        const db_sub_insert = await DBcall('db_insert_subscription', db_sub_data);
+        if(db_sub_insert.rowCount != 1) return serverError(res, 'Subscription error. Code 15'); //TODO: needs to be logged.
+        res.status(200).end();
+    }
+}
+
+app.post('/stripe-webhook', async (req, res) => {
+    // ------------ CONSUME FROM STRIPE QUEUE ------------ \\
+    const payload = req.body;
+    console.log(payload.type)
+    switch(payload.type){
+        case 'checkout.session.completed':
+            st.checkout_completed(req, res);
+            break;
+    }
+    res.status(400).end();
+});
+
 async function startServer(){
-    //const companies = (await db_getAllCompanies().catch(err=>console.log(err))).recordsets[0];
     const companies = await DBcall('db_getAllCompanies');
     await makeFuse(companies.rows);
 

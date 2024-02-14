@@ -80,7 +80,7 @@ const db_ops = {
         fn: async (oo) => {
             const {uid} = oo;
             const query = {
-                text:'SELECT fname, lname, email, uid from users where uid = $1',
+                text:'SELECT name, email, uid, stripe_customer_id from users where uid = $1',
                 values:[uid]
             }
             return await sql.query(query);
@@ -181,6 +181,42 @@ const db_ops = {
             return await sql.query(query);
         },
         required_params: ['uid', 'apitoken', 'exptime'],
+    },
+
+    db_create_account : {
+        fn: async (oo) => {
+            const {name, email, uid, stripe_customer_id} = oo;
+            const query = {
+                text:'INSERT into users(name, email, uid, stripe_customer_id) SELECT $1, $2, $3, $4',
+                values:[name, email, uid, stripe_customer_id]
+            }    
+            return await sql.query(query);
+        },
+        required_params: ['name', 'email', 'uid', 'stripe_customer_id'],
+    },
+    
+    db_insert_subscription : {
+        fn: async (oo) => {
+            const {id, stripe_customer, period_startdate, period_enddate, invoice_id} = oo;
+            const query = {
+                text:'INSERT INTO subscriptions (id, stripe_customer, period_startdate, period_enddate, invoice_id) SELECT $1, $2, $3, $4, $5',
+                values:[id, stripe_customer, period_startdate, period_enddate, invoice_id]
+            }    
+            return await sql.query(query);
+        },
+        required_params: ['id', 'stripe_customer', 'period_startdate', 'period_enddate', 'invoice_id'],
+    },
+
+    db_insert_invoice : {
+        fn: async (oo) => {
+            const {stripe_invoice_id, stripe_client, amount, created, currency} = oo;
+            const query = {
+                text:'INSERT INTO invoices (stripe_invoice_id, stripe_client, total, created, currency) SELECT $1, $2, $3, $4, $5',
+                values:[stripe_invoice_id, stripe_client, amount, created, currency]
+            }    
+            return await sql.query(query);
+        },
+        required_params: ['stripe_invoice_id', 'stripe_client', 'amount', 'created', 'currency'],
     },
 
     db_template : {
