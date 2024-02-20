@@ -8,7 +8,6 @@ import axios from 'axios';
 import {exponentialBackoff} from './utils.js';
 import compression from 'compression';
 import { v4 as uuidv4 } from 'uuid';
-import { TargetType } from 'puppeteer';
 import cookieParser from "cookie-parser";
 import admin from 'firebase-admin';
 import fb_creds from './fb_creds.json' assert { type: 'json' };
@@ -34,6 +33,7 @@ app.use(cookieParser());
 const fuse_options = {
     keys: ['symbol', 'name', 'chunks']
 };
+
 let fuse;
 
 async function makeFuse(companies){ // side effects! 
@@ -113,13 +113,14 @@ function authenticateToken(req, res, next) {
     const token = req?.cookies?.['AuthToken']; // Extract the token from the cookie
     if (!token) return res.sendStatus(401); // Unauthorized if there's no token
 
-    verifyAPIToken(token).then(uid => {
-        console.log('verified apitoken', uid, {token});
-        if(!uid) throw new Error('Invalid apitoken');
-        req.uid=uid;
+    verifyAPIToken(token).then(obj => {
+        console.log('verified apitoken', obj, {token});
+        if(!obj?.uid) throw new Error('Invalid apitoken');
+        req.uid=obj.uid;
+        req.credits=obj.credits || 0;
         next();
     }).catch(err => {
-        console.log('authenticateToken err:', err)
+        console.log('authenticateToken err:', err);
         res.sendStatus(403);
     });
 }
@@ -248,15 +249,26 @@ app.post('/messages', async (req, res) => {
 
 app.post('/completionproxy', authenticateToken, async (req, res) => {
     try{
+        console.log('credits', req.credits);
+        if(req.credits < 1) return res.status(403).send('Not enough credits'); 
         const url = 'http://127.0.0.1:5001/completion';
         const data = {messages:req.body.messages, filingID:req.body.filingID};
         const config = {'Content-Type':'application/json', responseType:'stream'};
         const py_response = await axios.post(url, data, config);
-        if(py_response.status === 200) creditAccount(req.uid);
+        if(py_response.status === 200) creditAccount({uid:req.uid});
         py_response.data.pipe(res);
     } catch (error) {
         console.error('Error proxying ai stream request:', error);
-        res.status(500).send('Failed to proxy ai stream.');
+        res.status(500).send('Failed proxy AI stream.');
+    }
+});
+
+app.post('/logs', async (req, res) => {
+    try{
+        DBcall('db_insert_log', req.body);
+    } catch(error){
+        console.error('Log write error ', req.body)
+        res.status(500).send();
     }
 });
 

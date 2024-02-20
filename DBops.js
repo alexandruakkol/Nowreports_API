@@ -20,9 +20,10 @@ const db_ops = {
     db_getAllCompanies : {
         fn: async () => {
             const query = {
-                text:`SELECT symbol, c.cik, country, mcap, f.chunks
+                text:`SELECT symbol, c.cik, country, mcap, f.chunks, c.name
                     from companies c
                     join filings f on c.cik=f.cik
+                    where chunks > 100
                     order by case when chunks is null then 0 else chunks end desc`,
                 values:[]
             }
@@ -236,6 +237,30 @@ const db_ops = {
             return await sql.query(query);
         },
         required_params: ['amount', 'stripe_customer_id'],
+    },
+
+    db_query_credits : {
+        fn: async (oo) => {
+            const {uid} = oo;
+            const query = {
+                text:'SELECT NULLIF(credits,0) from users where uid = $1',
+                values:[uid]
+            }    
+            return await sql.query(query);
+        },
+        required_params: ['uid'],
+    },
+
+    db_insert_log : {
+        fn: async (oo) => {
+            const {txt} = oo;
+            const query = {
+                text:'INSERT into client_logs(logtxt) SELECT $1',
+                values:[txt]
+            }    
+            return await sql.query(query);
+        },
+        required_params: ['txt'],
     },
 
     db_template : {
