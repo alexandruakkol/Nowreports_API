@@ -18,7 +18,7 @@ admin.initializeApp({
 });
 
 const DOMAIN = 'http://localhost:3000'
-const PORT = 8000;
+const PORT = 8005;
 const app = express();
 
 let corsOptions = {
