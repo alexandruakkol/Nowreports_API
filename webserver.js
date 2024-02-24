@@ -17,13 +17,13 @@ admin.initializeApp({
     credential: admin.credential.cert(fb_creds)
 });
 
-const DOMAIN = 'http://nowreports.com:8005'
+const DOMAIN = 'http://nowreports.com'
 const PORT = 8005;
 const app = express();
 const apiRouter = express.Router();
 
 let corsOptions = {
-    origin : ['http://localhost:3000', DOMAIN],
+    origin : ['http://localhost:3000', DOMAIN, 'http://www.nowreports.com'],
     credentials:true
 }
 
