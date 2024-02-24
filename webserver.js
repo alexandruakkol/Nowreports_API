@@ -191,6 +191,7 @@ app.post('/login', mid_decodeFirebaseJWST, async (req, res) => {
     if(!apitoken_data?.apitoken) return unauthorizedError(res, 'Could not get API token. Try again');
     
     res.cookie('AuthToken', apitoken_data.apitoken, {
+        path:'/api',
         // //httpOnly: true,
         // secure: false, // TODO: Set to true in production to send the cookie over HTTPS only
         // sameSite: 'None', //TODO: security check
