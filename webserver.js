@@ -17,15 +17,17 @@ admin.initializeApp({
     credential: admin.credential.cert(fb_creds)
 });
 
-const DOMAIN = 'http://localhost:3000'
+const DOMAIN = 'http://nowreports.com:8005'
 const PORT = 8005;
 const app = express();
+const apiRouter = express.Router();
 
 let corsOptions = {
     origin : ['http://localhost:3000', DOMAIN],
     credentials:true
 }
 
+app.use('/api', apiRouter);
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(cookieParser());
@@ -36,10 +38,9 @@ const fuse_options = {
 
 let fuse;
 
-async function makeFuse(companies){ // side effects! 
+async function makeFuse(companies){ // side effects!
     fuse = new Fuse(companies, fuse_options);
 }
-
 function padNumberWithZeros(number, length) {
     return String(number).padStart(length, '0');
 }
