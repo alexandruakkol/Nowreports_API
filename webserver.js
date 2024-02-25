@@ -191,7 +191,7 @@ app.post('/login', mid_decodeFirebaseJWST, async (req, res) => {
     if(!apitoken_data?.apitoken) return unauthorizedError(res, 'Could not get API token. Try again');
     
     res.cookie('AuthToken', apitoken_data.apitoken, {
-        path:'/api',
+        path:'/api', //TODO: this is for prod only.
         // //httpOnly: true,
         // secure: false, // TODO: Set to true in production to send the cookie over HTTPS only
         // sameSite: 'None', //TODO: security check
@@ -253,7 +253,7 @@ app.post('/completionproxy', authenticateToken, async (req, res) => {
     try{
         console.log('credits', req.credits);
         if(req.credits < 1) return res.status(403).send('Not enough credits'); 
-        const url = 'http://127.0.0.1:5001/completion';
+        const url = 'http://127.0.0.1:8006/completion';
         const data = {messages:req.body.messages, filingID:req.body.filingID};
         const config = {'Content-Type':'application/json', responseType:'stream'};
         const py_response = await axios.post(url, data, config);
