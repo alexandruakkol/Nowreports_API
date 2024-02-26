@@ -12,18 +12,21 @@ import cookieParser from "cookie-parser";
 import admin from 'firebase-admin';
 import fb_creds from './fb_creds.json' assert { type: 'json' };
 import stripeConfig from './stripe.js';
+import dotenv from 'dotenv';
 
+dotenv.config();
 admin.initializeApp({
     credential: admin.credential.cert(fb_creds)
 });
 
-const DOMAIN = 'http://nowreports.com'
+//const protocol = process.env.ENV === 'production' ? 'https' : 'http';
+const DOMAIN = 'https://nowreports.com'
 const PORT = 8005;
 const app = express();
 const apiRouter = express.Router();
 
 let corsOptions = {
-    origin : ['http://localhost:3000', DOMAIN, 'http://www.nowreports.com'],
+    origin : ['http://localhost:3000', DOMAIN, 'https://www.nowreports.com'],
     credentials:true
 }
 
@@ -191,7 +194,7 @@ app.post('/login', mid_decodeFirebaseJWST, async (req, res) => {
     if(!apitoken_data?.apitoken) return unauthorizedError(res, 'Could not get API token. Try again');
     
     res.cookie('AuthToken', apitoken_data.apitoken, {
-        path:'/api', //TODO: this is for prod only.
+        path: process.env.ENV === 'production' ? '/api' : '/', 
         // //httpOnly: true,
         // secure: false, // TODO: Set to true in production to send the cookie over HTTPS only
         // sameSite: 'None', //TODO: security check
