@@ -30,8 +30,8 @@ let corsOptions = {
     credentials:true
 }
 
-app.use('/api', apiRouter);
-app.use(cors(corsOptions));
+if(process.env.ENV === 'production') app.use('/api', apiRouter);
+app.use('*', cors(corsOptions));
 app.use(express.json());
 app.use(cookieParser());
 
@@ -114,6 +114,7 @@ function CIKlookup(companyName, options){
 }
 
 function authenticateToken(req, res, next) {
+    console.log('cook:',req?.cookies)
     const token = req?.cookies?.['AuthToken']; // Extract the token from the cookie
     if (!token) return res.sendStatus(401); // Unauthorized if there's no token
 
@@ -195,9 +196,9 @@ app.post('/login', mid_decodeFirebaseJWST, async (req, res) => {
     
     res.cookie('AuthToken', apitoken_data.apitoken, {
         path: process.env.ENV === 'production' ? '/api' : '/', 
-        // //httpOnly: true,
+        httpOnly: true,
         // secure: false, // TODO: Set to true in production to send the cookie over HTTPS only
-        // sameSite: 'None', //TODO: security check
+        //sameSite: 'None', //TODO: security check
         maxAge: 3600000,
     });
 
