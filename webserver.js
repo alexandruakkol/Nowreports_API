@@ -196,8 +196,8 @@ app.post('/login', mid_decodeFirebaseJWST, async (req, res) => {
     
     res.cookie('AuthToken', apitoken_data.apitoken, {
         path: process.env.ENV === 'production' ? '/api' : '/', 
-        httpOnly: true,
-        // secure: false, // TODO: Set to true in production to send the cookie over HTTPS only
+        secure: process.env.ENV === 'production' ? true : false, 
+        httpOnly:true,
         //sameSite: 'None', //TODO: security check
         maxAge: 3600000,
     });
