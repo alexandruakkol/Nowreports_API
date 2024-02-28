@@ -219,10 +219,8 @@ app.get('/links', async (req, res) => {
     res.json(docnr);
 });
 
-app.get('/test', async (req, res) => {
-    const file = fs.readFileSync('./payx2.txt');
-    console.log(file.toString());
-    res.send(file);
+app.get('/test', (req, res) => {
+    res.send();
 });
 
 app.get('/lastreport/:cik', compression(), async (req, res) => {
