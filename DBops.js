@@ -48,7 +48,7 @@ const db_ops = {
         fn: async (oo) => { //TODO: auth with uid too
             const {convoID} = oo;
             const msgs_query = {
-                text: 'SELECT id, agent, convoid, msg, date from messages where convoid = $1',
+                text: 'SELECT id, agent, convoid, msg, date from messages where convoid = $1 limit 200',
                 values: [convoID]
             }
             const convo_query = {
