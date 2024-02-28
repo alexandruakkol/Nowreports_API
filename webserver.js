@@ -249,8 +249,13 @@ app.get('/lastreport/:cik', compression(), async (req, res) => {
 });
 
 app.post('/messages', async (req, res) => {
-    //const db_res = await DBcall('db_sendMessage', req.body);
-    res.send();
+    try{
+        const db_res = await DBcall('db_sendMessage', req.body);
+        res.status(200).send();
+    } catch(err){
+        console.error('Message send error', err);
+        res.send(500).send();
+    }
 });
 
 app.post('/completionproxy', authenticateToken, async (req, res) => {
