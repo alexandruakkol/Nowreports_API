@@ -14,12 +14,14 @@ import fb_creds from './fb_creds.json' assert { type: 'json' };
 import stripeConfig from './stripe.js';
 import dotenv from 'dotenv';
 
+//TODO: modularize these sections (in Classes maybe)
+/////////////////// -------- CONFIG -------- \\\\\\\\\\\\\\\\\\\\\\\\\\
+
 dotenv.config();
 admin.initializeApp({
     credential: admin.credential.cert(fb_creds)
 });
 
-//const protocol = process.env.ENV === 'production' ? 'https' : 'http';
 const DOMAIN = 'https://nowreports.com'
 const AI_API_ADDR = 'http://127.0.0.1:8006/completion';
 const PORT = 8005;
@@ -36,15 +38,19 @@ app.use('*', cors(corsOptions));
 app.use(express.json());
 app.use(cookieParser());
 
+/////////////////// -------- FUSE INIT -------- \\\\\\\\\\\\\\\\\\\\\\\\\\
+let fuse;
+
 const fuse_options = {
     keys: ['symbol', 'name', 'chunks']
 };
 
-let fuse;
-
 async function makeFuse(companies){ // side effects!
     fuse = new Fuse(companies, fuse_options);
 }
+
+/////////////////// -------- UTILS -------- \\\\\\\\\\\\\\\\\\\\\\\\\\
+
 function padNumberWithZeros(number, length) {
     return String(number).padStart(length, '0');
 }
@@ -60,6 +66,13 @@ function generateRandomString(length) {
   
     return randomString;
 }
+
+function genExpirationDate(oo){
+    let expdate = new Date();
+    expdate.setMonth(expdate.getMonth() + oo.month);
+    return expdate;
+}
+/////////////////// -------- API UTILS -------- \\\\\\\\\\\\\\\\\\\\\\\\\\
 
 function clientError(res, message=null){
     res.statusCode = 400;
@@ -77,12 +90,6 @@ function unauthorizedError(res, message=null){
     res.json(message && message);
 }
 
-function genExpirationDate(oo){
-    let expdate = new Date();
-    expdate.setMonth(expdate.getMonth() + oo.month);
-    return expdate;
-}
-
 async function getAPITokenByUID(uid){
     let resp = await DBcall('db_get_apitoken_by_uid', {uid});
     return resp?.rows?.[0];
@@ -97,6 +104,7 @@ async function verifyAPIToken(apitoken){
 async function creditAccount(uid){
     DBcall('db_credit_account', uid);
 }
+
 
 function CIKlookup(companyName, options){
     console.log(`== CIK lookup for ${companyName} ==`);
@@ -142,6 +150,8 @@ const mid_decodeFirebaseJWST = async (req, res, next) => {
         res.status(401).send('Unauthorized');
     }
 };
+
+/////////////////// -------- API PATHS -------- \\\\\\\\\\\\\\\\\\\\\\\\\
 
 app.get('/companies', (req, res) => {  
     const lookupRes = CIKlookup(req.query.q);
@@ -233,7 +243,7 @@ app.get('/tests/ai', async (req, res) => {
         console.error('AI testing endpoint fail', err);
         res.status(500).send();
     }
-})
+});
 
 app.get('/lastreport/:cik', compression(), async (req, res) => {
     function trim_xml(xmltext){
@@ -292,13 +302,18 @@ app.post('/logs', async (req, res) => {
     }
 });
 
-stripeConfig().then(stripe => {
+//TODO: move this on top of file
+stripeConfig().then(async stripe => {
+
+    const key = process.env.ENV === 'production' ? 'stripe_priceid' : 'stripe_test_priceid';
+    const priceid_key = (await DBcall('db_get_diverse_webserver', {key})).rows[0].value;
+
     app.post('/create-checkout-session', async (req, res) => {
         const session = await stripe.checkout.sessions.create({
           customer:req.body.customer,
           line_items: [
             {
-              price: 'price_1OjBq2HAuXo1x4cNQ7b3vqL9',
+              price: priceid_key,
               quantity: 1,
             },
           ],
@@ -315,7 +330,7 @@ stripeConfig().then(stripe => {
         const customer = await stripe.customers.create({name, email});
         res.json(customer);
     })
-})
+});
 
 //=================================================================\\
 // ------------------------ STRIPE WEBHOOK ------------------------\\
@@ -363,7 +378,6 @@ const st = {
 app.post('/stripe-webhook', async (req, res) => {
     // ------------ CONSUME FROM STRIPE QUEUE ------------ \\
     const payload = req.body;
-    console.log(payload.type)
     switch(payload.type){
         case 'checkout.session.completed':
             st.checkout_completed(req, res);

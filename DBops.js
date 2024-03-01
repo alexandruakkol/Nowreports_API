@@ -263,6 +263,17 @@ const db_ops = {
         required_params: ['txt'],
     },
 
+    db_get_diverse_webserver : {
+        fn: async (oo) => {
+            const query = {
+                text:`SELECT key, value from diverse where key = $1`,
+                values:[oo.key]
+            }    
+            return await sql.query(query);
+        },
+        required_params: ['key'],
+    },
+
     db_template : {
         fn: async (oo) => {
             const {cik} = oo;
