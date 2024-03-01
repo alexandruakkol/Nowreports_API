@@ -21,6 +21,7 @@ admin.initializeApp({
 
 //const protocol = process.env.ENV === 'production' ? 'https' : 'http';
 const DOMAIN = 'https://nowreports.com'
+const AI_API_ADDR = 'http://127.0.0.1:8006/completion';
 const PORT = 8005;
 const app = express();
 const apiRouter = express.Router();
@@ -219,9 +220,20 @@ app.get('/links', async (req, res) => {
     res.json(docnr);
 });
 
-app.get('/test', (req, res) => {
+app.get('/tests/api', (req, res) => {
     res.send();
 });
+
+app.get('/tests/ai', async (req, res) => {
+    try{
+        const ai_res = await axios.get(AI_API_ADDR.replace('/completion', '/test'));
+        console.log({ai_res});
+        res.send();
+    }catch(err){
+        console.error('AI testing endpoint fail', err);
+        res.status(500).send();
+    }
+})
 
 app.get('/lastreport/:cik', compression(), async (req, res) => {
     function trim_xml(xmltext){
@@ -260,10 +272,9 @@ app.post('/completionproxy', authenticateToken, async (req, res) => {
     try{
         console.log('credits', req.credits);
         if(req.credits < 1) return res.status(403).send('Not enough credits'); 
-        const url = 'http://127.0.0.1:8006/completion';
         const data = {messages:req.body.messages, filingID:req.body.filingID};
         const config = {'Content-Type':'application/json', responseType:'stream'};
-        const py_response = await axios.post(url, data, config);
+        const py_response = await axios.post(AI_API_ADDR, data, config);
         if(py_response.status === 200) creditAccount({uid:req.uid});
         py_response.data.pipe(res);
     } catch (error) {
