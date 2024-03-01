@@ -309,18 +309,21 @@ stripeConfig().then(async stripe => {
     const priceid_key = (await DBcall('db_get_diverse_webserver', {key})).rows[0].value;
 
     app.post('/create-checkout-session', async (req, res) => {
-        const session = await stripe.checkout.sessions.create({
-          customer:req.body.customer,
-          line_items: [
-            {
-              price: priceid_key,
-              quantity: 1,
-            },
-          ],
-          mode: 'subscription',
-          success_url: `${DOMAIN}/subscription?success=true`,
-          cancel_url: `${DOMAIN}/subscription?canceled=true`,
-        });
+        const checkoutObj = {
+            customer:req.body.customer,
+            line_items: [
+              {
+                price: priceid_key,
+                quantity: 1,
+              },
+            ],
+            mode: 'subscription',
+            success_url: `${DOMAIN}/subscription?success=true`,
+            cancel_url: `${DOMAIN}/subscription?canceled=true`,
+        };
+        if(req.body.email.endsWith('nowreports.com')) checkoutObj.discounts = [{"coupon": "axY4PqGK"}];
+
+        const session = await stripe.checkout.sessions.create(checkoutObj);
       
         res.json({url: session.url})
     });
@@ -385,6 +388,8 @@ app.post('/stripe-webhook', async (req, res) => {
     }
     res.status(400).end();
 });
+
+
 
 async function startServer(){
     const companies = await DBcall('db_getAllCompanies');
