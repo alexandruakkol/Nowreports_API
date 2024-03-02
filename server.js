@@ -127,7 +127,7 @@ async function getLastAnnualFromDB(cik){
 async function getDocNumber(oo){  // MODULE START
   
   if(global?.appdata) BASE_DATA_URL = global?.appdata.SEC_BASEURL;
-  let {cik, year, type} = oo;  
+  let {cik, year, type, mode} = oo;  
   if(!type) type='annual';
   if(!['annual', 'quarterly'].includes(type)) return console.error('getDocNumber no type');
   if(!year) year = (new Date()).getFullYear();
@@ -135,9 +135,12 @@ async function getDocNumber(oo){  // MODULE START
   if(type == 'annual') type = '10-K';
   if(type == 'quarterly') type = '10-Q';
 
-  if(type === '10-K') {
+  if((type === '10-K') && (mode !== 'update')) {
     const DBcheck = await getLastAnnualFromDB(cik);
-    if(DBcheck) return DBcheck;
+    if(DBcheck) {
+      console.log(`-- ${cik} already in DB. Skipping ...`)
+      return DBcheck;
+    }
   }
 
   const browser = await puppeteer.launch(PUP_BROWSER_CONFIG);

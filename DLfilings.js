@@ -26,11 +26,10 @@ async function startFilingsDownload(oo){
         console.log('pulling ', cik);
         let cleanupCounter = 0;
         try{
-            await getDocNumber({cik, type:'annual'});
+            await getDocNumber({cik, type:'annual', mode:oo.mode});
         }
         catch(err){
             console.log('COULD NOT PULL CIK ', cik, err);
-            //DBcall('db_insertFiling', {cik, typ:'10-K', reportURL:'', date:''} );
         } finally {
             if(process.env.NODE_ENV === 'production') {
                 cleanupCounter++;
