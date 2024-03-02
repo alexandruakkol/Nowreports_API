@@ -194,7 +194,6 @@ app.post('/login', mid_decodeFirebaseJWST, async (req, res) => {
             uid,
             apitoken: uuidv4(), 
             exptime: genExpirationDate({month:1}), 
-            credits: 3 // TODO: delete
         }
 
         const newtoken_res = await DBcall('db_write_apitoken', newtoken_input);
