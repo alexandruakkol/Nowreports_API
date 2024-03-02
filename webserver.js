@@ -97,7 +97,6 @@ async function getAPITokenByUID(uid){
 
 async function verifyAPIToken(apitoken){
     let resp = await DBcall('db_verify_apitoken', {apitoken});
-    console.log({resp});
     return resp?.rows?.[0];
 }
 
@@ -123,12 +122,11 @@ function CIKlookup(companyName, options){
 }
 
 function authenticateToken(req, res, next) {
-    console.log('cook:',req?.cookies)
     const token = req?.cookies?.['AuthToken']; // Extract the token from the cookie
+    console.log('cook',req?.cookies?.['AuthToken'] );
     if (!token) return res.sendStatus(401); // Unauthorized if there's no token
 
     verifyAPIToken(token).then(obj => {
-        console.log('verified apitoken', obj, {token});
         if(!obj?.uid) throw new Error('Invalid apitoken');
         req.uid=obj.uid;
         req.credits=obj.credits || 0;
@@ -216,6 +214,17 @@ app.post('/login', mid_decodeFirebaseJWST, async (req, res) => {
     res.json({...db_res.rows[0], ...apitoken_data});
 });
 
+app.get('/products', async(req, res) => {
+    try{
+        const products = await DBcall('db_get_product_types');
+        res.json(products);
+    }
+    catch(err){
+        console.log(err);
+        res.status(500).send();
+    }
+})
+
 app.get('/links', async (req, res) => {
     let {q, year, type} = req.query;
     let cik;
@@ -237,7 +246,6 @@ app.get('/tests/api', (req, res) => {
 app.get('/tests/ai', async (req, res) => {
     try{
         const ai_res = await axios.get(AI_API_ADDR.replace('/completion', '/test'));
-        console.log({ai_res});
         res.send();
     }catch(err){
         console.error('AI testing endpoint fail', err);
@@ -280,8 +288,7 @@ app.post('/messages', async (req, res) => {
 
 app.post('/completionproxy', authenticateToken, async (req, res) => {
     try{
-        console.log('credits', req.credits);
-        if(req.credits < 1) return res.status(403).send('Not enough credits'); 
+        if(req.credits < 1) return res.status(403).send('Monthly query limit exceeded'); 
         const data = {messages:req.body.messages, filingID:req.body.filingID};
         const config = {'Content-Type':'application/json', responseType:'stream'};
         const py_response = await axios.post(AI_API_ADDR, data, config);

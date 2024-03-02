@@ -274,6 +274,16 @@ const db_ops = {
         required_params: ['key'],
     },
 
+    db_get_product_types : {
+        fn: async () => {
+            const query = {
+                text:'SELECT product_code, product_type, price, subscription_interval, interval_quota from product_types',
+            }    
+            return await sql.query(query);
+        },
+        required_params: [],
+    },
+
     db_template : {
         fn: async (oo) => {
             const {cik} = oo;
