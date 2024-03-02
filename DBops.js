@@ -81,7 +81,7 @@ const db_ops = {
         fn: async (oo) => {
             const {uid} = oo;
             const query = {
-                text:`SELECT name, email, uid, stripe_customer_id, s.period_enddate as sub_exp
+                text:`SELECT name, email, uid, stripe_customer_id, s.period_enddate as sub_exp, s.id as sub_id
                     from users u
                     left join subscriptions s on 
                         (u.stripe_customer_id=s.stripe_customer) 

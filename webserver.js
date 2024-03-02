@@ -321,7 +321,7 @@ stripeConfig().then(async stripe => {
             success_url: `${DOMAIN}/subscription?success=true`,
             cancel_url: `${DOMAIN}/subscription?canceled=true`,
         };
-        if(req.body.email.endsWith('nowreports.com')) checkoutObj.discounts = [{"coupon": "axY4PqGK"}];
+        if(req.body?.email?.endsWith('nowreports.com')) checkoutObj.discounts = [{"coupon": "axY4PqGK"}];
 
         const session = await stripe.checkout.sessions.create(checkoutObj);
       
@@ -332,6 +332,21 @@ stripeConfig().then(async stripe => {
         const {name, email} = req.body;
         const customer = await stripe.customers.create({name, email});
         res.json(customer);
+    });
+
+    app.post('/cancel-subscription', async (req, res) => {
+        try{
+            const {subID} = req.body;
+            const sub_cancel = await stripe.subscriptions.update(
+                subID,
+                {
+                  cancel_at_period_end: true,
+                }
+            );
+            res.send();
+        }catch(err){
+            res.status(500).send();
+        }
     })
 });
 
