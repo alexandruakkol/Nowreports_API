@@ -208,7 +208,7 @@ async function getDocNumber(oo){  // MODULE START
     // ---------------- LOOKUP UTILS ---------------- \\
     async function cleanup(foundObj, browser, cik){
       browser.close();
-      DBcall('db_insertFiling', {...foundObj, cik} );
+      DBcall('db_insertFiling', {...foundObj, cik} )
     }
   
     async function checkCandidateReports(list){

@@ -70,7 +70,7 @@ const db_ops = {
         fn: async (oo) => {
             const {cik} = oo;
             const query = {
-                text:'SELECT * from filings where cik = $1',
+                text:'SELECT * from filings where cik = $1 order by pulldate desc',
                 values:[cik]
             }    
             return await sql.query(query);
@@ -128,7 +128,7 @@ const db_ops = {
                     typ
                 ],
             }
-            await sql.query(query).catch(err => console.log(err));
+            await sql.query(query);
             },
         required_params: ['cik', 'reportURL', 'year', 'date', 'typ']
     },
@@ -316,6 +316,7 @@ async function DBcall(fn_string, args=[]){
         check_required_params(db_ops[fn_string], args);
         res = await fn(args);
     } catch(err){
+        if(fn_string === 'db_insertFiling' && err.code === '23505') return console.log('skipping...');
         console.log(fn_string && fn_string, err);
         res = {error:true};
     }

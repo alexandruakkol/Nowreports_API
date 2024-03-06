@@ -6,13 +6,20 @@ const {exec} = Childprocess;
 async function startFilingsDownload(oo){
     let toDL_list;
 
-    if(oo.mode == 'update') toDL_list = (await sql.query(`select cik from companies where country='United States' order by mcap desc limit 50`))?.rows;
+    if(oo.mode == 'update') toDL_list = (await sql.query(`
+        select cik 
+        from companies 
+        where country='United States' 
+        and (lastfiling < (CURRENT_DATE - INTERVAL '10 days') or lastfiling is null)
+        order by mcap desc limit 50
+    `))?.rows;
+
     if(oo.mode.startsWith('append') ) toDL_list = (await sql.query(`   
        select c.cik 
         from companies c
         left join filings f on (f.cik=c.cik)
         where f.cik is null and c.country='United States'
-        order by mcap desc
+        order by mcap desc 
         limit 50
     `))?.rows;
 
@@ -21,6 +28,8 @@ async function startFilingsDownload(oo){
     if(oo.mode.includes('reverse')) toDL_list.sort();
 
     console.log(`Pulling ${toDL_list.length} tickers`);
+
+    if(!toDL_list.length) {console.log('all tickers updated'); process.exit();}
 
     for(const cik of toDL_list){
         console.log('pulling ', cik);
@@ -51,8 +60,8 @@ async function startFilingsDownload(oo){
         }
         console.log('pulled ', cik);
     }
-    console.log('-----Scheduled restart-----')
-    process.exit();
+    console.log('-----Scheduled restart-----');
+    startFilingsDownload(oo); // recursive call for next batch
 }
 
 export {startFilingsDownload};
