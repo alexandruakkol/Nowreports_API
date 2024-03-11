@@ -301,12 +301,33 @@ app.post('/completionproxy', authenticateToken, async (req, res) => {
 
 app.post('/logs', async (req, res) => {
     try{
-        DBcall('db_insert_log', req.body);
+        await DBcall('db_insert_log', req.body);
     } catch(error){
         console.error('Log write error ', req.body)
         res.status(500).send();
     }
+    res.send();
 });
+
+app.post('/feedback', async (req, res) => {
+    try{
+        await DBcall('db_insert_feedback', req.body);
+    }catch(err){
+        console.error('Feedback send error ', req.body)
+        res.status(500).send();
+    }
+    res.send();
+})
+
+app.get('/features', async (req, res) => {
+    try{
+        const db_res = await DBcall('db_get_newfeatures', req.body);
+        res.send(db_res?.rows);
+    }catch(err){
+        console.error('Features get error ', req.body)
+        res.status(500).send();
+    }
+})
 
 //TODO: move this on top of file
 stripeConfig().then(async stripe => {
@@ -315,29 +336,38 @@ stripeConfig().then(async stripe => {
     const priceid_key = (await DBcall('db_get_diverse_webserver', {key})).rows[0].value;
 
     app.post('/create-checkout-session', async (req, res) => {
-        const checkoutObj = {
-            customer:req.body.customer,
-            line_items: [
-              {
-                price: priceid_key,
-                quantity: 1,
-              },
-            ],
-            mode: 'subscription',
-            success_url: `${DOMAIN}/subscription?success=true`,
-            cancel_url: `${DOMAIN}/subscription?canceled=true`,
-        };
-        if(req.body?.email?.endsWith('nowreports.com')) checkoutObj.discounts = [{"coupon": "axY4PqGK"}];
+        try{
+            const checkoutObj = {
+                customer:req.body.customer,
+                line_items: [
+                  {
+                    price: priceid_key,
+                    quantity: 1,
+                  },
+                ],
+                mode: 'subscription',
+                success_url: `${DOMAIN}/subscription?success=true`,
+                cancel_url: `${DOMAIN}/subscription?canceled=true`,
+            };
+            if(req.body?.email?.endsWith('nowreports.com')) checkoutObj.discounts = [{"coupon": "axY4PqGK"}];
+            const session = await stripe.checkout.sessions.create(checkoutObj);
+            res.json({url: session.url});
 
-        const session = await stripe.checkout.sessions.create(checkoutObj);
-      
-        res.json({url: session.url})
+        }catch(err){
+            console.log(first);
+            res.status(500).send();
+        }
     });
 
     app.post('/create-stripe-customer', async(req, res) => {
-        const {name, email} = req.body;
-        const customer = await stripe.customers.create({name, email});
-        res.json(customer);
+        try{
+            const {name, email} = req.body;
+            const customer = await stripe.customers.create({name, email});
+            res.json(customer);
+        }catch(err){
+            console.log(first);
+            res.status(500).send();
+        }
     });
 
     app.post('/cancel-subscription', async (req, res) => {

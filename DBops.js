@@ -53,7 +53,7 @@ const db_ops = {
             }
             const convo_query = {
                 text:`
-                    SELECT convoid, uid, c.symbol, createddate, f.typ, f.repdate, f.cik, f.id as filingid
+                    SELECT convoid, uid, c.symbol, createddate, f.typ, f.repdate, f.cik, f.id as filingid, co.name
                     from conversations c
                     join companies co on c.symbol=co.symbol
                     left join filings f on f.cik=co.cik
@@ -278,6 +278,29 @@ const db_ops = {
         fn: async () => {
             const query = {
                 text:'SELECT product_code, product_type, price, subscription_interval, interval_quota from product_types',
+            }    
+            return await sql.query(query);
+        },
+        required_params: [],
+    },
+
+    db_insert_feedback : {
+        fn: async (oo) => {
+            const {text, typ} = oo;
+            const query = {
+                text: `INSERT into feedback (text, typ) SELECT $1, $2`,
+                values: [text, typ]
+            }    
+            return await sql.query(query);
+        },
+        required_params: ['text', 'typ'],
+    },
+
+    db_get_newfeatures : {
+        fn: async () => {
+            const query = {
+                text:`SELECT code, name, description from newfeatures`,
+                values:[]
             }    
             return await sql.query(query);
         },
