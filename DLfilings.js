@@ -10,7 +10,7 @@ async function startFilingsDownload(oo){
         select cik 
         from companies 
         where country='United States' 
-        and (lastfiling < (CURRENT_DATE - INTERVAL '10 days') or lastfiling is null)
+        and (lastfiling < (CURRENT_DATE - INTERVAL '10 days') or lastfiling is null) and symbol = 'NKE'
         order by mcap desc limit 50
     `))?.rows;
 
@@ -18,7 +18,7 @@ async function startFilingsDownload(oo){
        select c.cik 
         from companies c
         left join filings f on (f.cik=c.cik)
-        where f.cik is null and c.country='United States'
+        where f.cik is null and c.country='United States' and symbol = 'NKE'
         order by mcap desc 
         limit 50
     `))?.rows;

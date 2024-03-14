@@ -346,6 +346,7 @@ stripeConfig().then(async stripe => {
                   },
                 ],
                 mode: 'subscription',
+                allow_promotion_codes: true,
                 success_url: `${DOMAIN}/subscription?success=true`,
                 cancel_url: `${DOMAIN}/subscription?canceled=true`,
             };
@@ -354,7 +355,7 @@ stripeConfig().then(async stripe => {
             res.json({url: session.url});
 
         }catch(err){
-            console.log(first);
+            console.log(err);
             res.status(500).send();
         }
     });

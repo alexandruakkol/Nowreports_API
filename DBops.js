@@ -195,7 +195,7 @@ const db_ops = {
         fn: async (oo) => {
             const {name, email, uid, stripe_customer_id} = oo;
             const query = {
-                text:'INSERT into users(name, email, uid, stripe_customer_id, credits) SELECT $1, $2, $3, $4, 10',
+                text:'INSERT into users(name, email, uid, stripe_customer_id, credits) SELECT $1, $2, $3, $4, 30',
                 values:[name, email, uid, stripe_customer_id]
             }    
             return await sql.query(query);
