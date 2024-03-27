@@ -1,4 +1,4 @@
-import company_tickers from './company_tickers.json' assert { type: 'json' };
+import company_tickers from './data/company_tickers.json' assert { type: 'json' };
 import dotenv from 'dotenv';
 import pkg from 'pg';
 import readline from 'readline';
@@ -39,7 +39,7 @@ async function startMove(){
 } 
 
 async function matchMcap(){
-    const fileStream = fs.createReadStream('./mcap.csv');
+    const fileStream = fs.createReadStream('./data/mcap.csv');
     
     const rl = readline.createInterface({
         input: fileStream,

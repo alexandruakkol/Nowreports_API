@@ -1,4 +1,4 @@
-import company_tickers from './company_tickers.json' assert { type: 'json' };
+import company_tickers from './data/company_tickers.json' assert { type: 'json' };
 import Fuse from 'fuse.js';
 import puppeteer from 'puppeteer';
 import dotenv from 'dotenv';
