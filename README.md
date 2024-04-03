@@ -10,7 +10,7 @@ This module serves three major functions in the Nowreports system:
 - serving dynamic data to the Nowreports Portal
 - handing payments and subscriptions through Stripe
 - keeping the database up to date with the latest financial reports
-
+ 
 Google Firebase is only used for authentication.
 
 Deployed in production on nowreports.com/api, via Nginx Reverse Proxy and PM2 for process management.
