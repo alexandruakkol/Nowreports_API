@@ -122,8 +122,9 @@ function CIKlookup(companyName, options){
 }
 
 function authenticateToken(req, res, next) {
+
     const token = req?.cookies?.['AuthToken']; // Extract the token from the cookie
-    console.log('cook',req?.cookies?.['AuthToken'] );
+    //console.log('cook',req?.cookies?.['AuthToken'] );
     if (!token) return res.sendStatus(401); // Unauthorized if there's no token
 
     verifyAPIToken(token).then(obj => {
@@ -144,7 +145,7 @@ const mid_decodeFirebaseJWST = async (req, res, next) => {
         req.user = decodedToken;
         next();
     } catch (error) {
-        console.log('decodeFirebaseJWST error: ', error)
+        console.log('decodeFirebaseJWST error: ', error);
         res.status(401).send('Unauthorized');
     }
 };
@@ -185,7 +186,7 @@ app.post('/login', mid_decodeFirebaseJWST, async (req, res) => {
     // ---------- DB verify user ---------- \\
     const db_res = await DBcall('db_getUser', {uid});
     if(db_res.error) return clientError(res);
-
+    
     // ---------- DB verify token ---------- \\
     let apitoken_data = await getAPITokenByUID(uid);
     if(!apitoken_data){
@@ -201,13 +202,13 @@ app.post('/login', mid_decodeFirebaseJWST, async (req, res) => {
         apitoken_data = await getAPITokenByUID(uid);
     }         
     if(!apitoken_data?.apitoken) return unauthorizedError(res, 'Could not get API token. Try again');
-    
+
     res.cookie('AuthToken', apitoken_data.apitoken, {
         path: process.env.ENV === 'production' ? '/api' : '/', 
         secure: process.env.ENV === 'production' ? true : false, 
         httpOnly:true,
         //sameSite: 'None', //TODO: security check
-        maxAge: 3600000,
+        maxAge: 3600000 * 336, //2 wks of expiry
     });
 
     res.json({...db_res.rows[0], ...apitoken_data});
@@ -366,7 +367,6 @@ stripeConfig().then(async stripe => {
             const customer = await stripe.customers.create({name, email});
             res.json(customer);
         }catch(err){
-            console.log(first);
             res.status(500).send();
         }
     });
