@@ -4,3 +4,6 @@ AI/embed.py
 fb_creds.json
 test.json
 .DS_Store
+bge_new.jsonl
+bge_training_data.jsonl
+training_m3.jsonl

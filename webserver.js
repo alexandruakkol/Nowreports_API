@@ -28,6 +28,8 @@ const PORT = 8005;
 const app = express();
 const apiRouter = express.Router();
 
+app.use(express.static('./served_assets'));
+
 let corsOptions = {
     origin : ['http://localhost:3000', DOMAIN, 'https://www.nowreports.com'],
     credentials:true
