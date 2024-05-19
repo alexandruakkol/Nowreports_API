@@ -307,6 +307,30 @@ const db_ops = {
         required_params: [],
     },
 
+    db_insert_transcript : {
+        fn: async (oo) => {
+            const {callPeriod, symbol, callid} = oo;
+            const query = {
+                text:`INSERT INTO earningsCalls(symbol, period, callid, status) SELECT $1, $2, $3, 'new'`,
+                values:[symbol, callPeriod, callid]
+            }    
+            return await sql.query(query);
+        },
+        required_params: ['callPeriod', 'symbol', 'callid'],
+    },
+
+    db_insert_transcript_message : {
+        fn: async (oo) => {
+            const {text, agent, callid} = oo;
+            const query = {
+                text:'INSERT into earningsMessages(callid, txt, agent) SELECT $1, $2, $3',
+                values:[callid, text, agent]
+            }    
+            return await sql.query(query);
+        },
+        required_params: ['text', 'agent', 'callid'],
+    },
+
     db_template : {
         fn: async (oo) => {
             const {cik} = oo;

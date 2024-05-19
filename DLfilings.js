@@ -7,23 +7,23 @@ async function startFilingsDownload(oo){
     let toDL_list;
 
     if(oo.mode == 'update') toDL_list = (await sql.query(`
-        select cik 
+        select cik, symbol 
         from companies 
         where country='United States' 
-        and (lastfiling < (CURRENT_DATE - INTERVAL '10 days') or lastfiling is null) and symbol = 'NKE'
+        and (lastfiling < (CURRENT_DATE - INTERVAL '10 days') or lastfiling is null) -- and symbol = 'NKE'
         order by mcap desc limit 50
     `))?.rows;
 
     if(oo.mode.startsWith('append') ) toDL_list = (await sql.query(`   
-       select c.cik 
+       select c.cik, c.symbol
         from companies c
         left join filings f on (f.cik=c.cik)
-        where f.cik is null and c.country='United States' and symbol = 'NKE'
+        where f.cik is null and c.country='United States'
         order by mcap desc 
         limit 50
     `))?.rows;
 
-    toDL_list = toDL_list.map(x => x.cik);
+    toDL_list = toDL_list.map(x => { return {cik:x.cik, symbol:x.symbol} });
 
     if(oo.mode.includes('reverse')) toDL_list.sort();
 
@@ -35,7 +35,7 @@ async function startFilingsDownload(oo){
         console.log('pulling ', cik);
         let cleanupCounter = 0;
         try{
-            await getDocNumber({cik, type:'annual', mode:oo.mode});
+            await getDocNumber({cik:cik.cik, type:'annual', mode:oo.mode, symbol:cik.symbol});
         }
         catch(err){
             console.log('COULD NOT PULL CIK ', cik, err);
