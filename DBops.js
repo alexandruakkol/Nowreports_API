@@ -44,6 +44,18 @@ const db_ops = {
         },
         required_params : ['convoID', 'uid', 'ticker']
     },
+    db_update_comapnies : {
+        fn: async (oo) => {
+            const {cik} = oo;
+            let query = {
+                text:`
+                UPDATE companies set lastfiling=CURRENT_DATE where cik = $1;`,
+                values: [cik]
+            }
+            return await sql.query(query);
+        },
+        required_params : ['cik']
+    },
     db_getConvo : {
         fn: async (oo) => { //TODO: auth with uid too
             const {convoID} = oo;

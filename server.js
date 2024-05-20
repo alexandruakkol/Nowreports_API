@@ -244,6 +244,10 @@ async function getDocNumber(oo){  // MODULE START
     await browser.close(); // so that browser never hangs
     throw new Error(err);
   }
+  finally{
+    // mark filing update
+    DBcall('db_update_comapnies', {cik});
+  }
 }
 
 export {getDocNumber, sendErrorCIKToDB};
