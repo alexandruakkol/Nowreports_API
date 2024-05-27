@@ -22,7 +22,7 @@ admin.initializeApp({
     credential: admin.credential.cert(fb_creds)
 });
 
-const DOMAIN = 'https://nowreports.com'
+const DOMAIN = 'https://ceochat.nowreports.com'
 const AI_API_ADDR = 'http://127.0.0.1:8006/completion';
 const PORT = 8005;
 const app = express();
