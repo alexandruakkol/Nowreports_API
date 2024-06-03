@@ -349,7 +349,7 @@ stripeConfig().then(async stripe => {
                   },
                 ],
                 mode: 'subscription',
-                allow_promotion_codes: true,
+                //allow_promotion_codes: true,
                 success_url: `${DOMAIN}/subscription?success=true`,
                 cancel_url: `${DOMAIN}/subscription?canceled=true`,
             };
