@@ -177,17 +177,17 @@ const db_ops = {
 
     db_credit_account : {
         fn: async (oo) => {
-            const {uid} = oo;
+            const {uid, amount} = oo;
             const query = {
                 text:`
                     UPDATE users
-                    SET credits = credits - 1
+                    SET credits = credits - $2
                     WHERE uid = $1`,
-                values:[uid]
+                values:[uid, amount]
             }    
             return await sql.query(query);
         },
-        required_params: ['uid'],
+        required_params: ['uid', 'amount'],
     },
 
     db_write_apitoken : {

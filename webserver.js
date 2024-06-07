@@ -102,8 +102,8 @@ async function verifyAPIToken(apitoken){
     return resp?.rows?.[0];
 }
 
-async function creditAccount(uid){
-    DBcall('db_credit_account', uid);
+async function creditAccount(uid, amount=1){
+    DBcall('db_credit_account', {uid, amount});
 }
 
 
@@ -294,7 +294,7 @@ app.post('/completionproxy', authenticateToken, async (req, res) => {
         const data = {messages:req.body.messages, filingID:req.body.filingID};
         const config = {'Content-Type':'application/json', responseType:'stream'};
         const py_response = await axios.post(AI_API_ADDR, data, config);
-        if(py_response.status === 200) creditAccount({uid:req.uid});
+        if(py_response.status === 200) creditAccount(req.uid);
         py_response.data.pipe(res);
     } catch (error) {
         console.error('Error proxying ai stream request:', error);
@@ -340,6 +340,8 @@ app.get('/report', authenticateToken, async (req, res) => {
         // send response if reports in DB
         if(cached_reports.length){ 
             res.send(cached_reports); 
+            //subtract two credits
+            if(cached_reports.length) creditAccount(req.uid, 2);
             return true; 
         }
         return false;
@@ -378,11 +380,12 @@ app.get('/report', authenticateToken, async (req, res) => {
         const has_secondary_idlist = questions_arr.map(q => q.prev);
 
         Promise.all(promises).then(async responses => {
+            
             for(let i=0; i < responses.length; i++){
-
+                
                 const response = responses[i];
                 let questionid = questions_arr[i].id;
-
+                
                 // if response has a next step, get it. now it's all in sequence (if you have more than one double question, is inefficient)
                 //todo for more double questions is another Promise.all queue for batching 2nd instead of interating and awaiting
                 if(has_secondary_idlist.includes(questionid) && !response.data.includes("insignificant")){
@@ -391,11 +394,12 @@ app.get('/report', authenticateToken, async (req, res) => {
                     response.data = second_response.data;
                     questionid = second_question_obj.id;
                 }
-
+                
                 const py_response = response.data.replaceAll('[ss]','');
                 //write to cache
                 await DBcall('db_insert_report_piece', { questionid:questionid, filingid:req.query.filingID, reply:py_response });
             }
+
             // try read from cache 2nd time
             const has_sent_report = await try_get_report();
             if(has_sent_report) return; 
@@ -404,7 +408,6 @@ app.get('/report', authenticateToken, async (req, res) => {
         );
         // const res_data = py_response.data.replaceAll('[ss]','');
         // const db_res = await DBcall('db_insert_report_piece', { questionid:id, filingid:req.query.filingID, reply:res_data });
-        //if(py_response.status === 200) creditAccount({uid:req.uid});
 
         //res.send(db_res?.rows);
     }catch(err){
