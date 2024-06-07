@@ -330,7 +330,88 @@ app.get('/features', async (req, res) => {
         console.error('Features get error ', req.body)
         res.status(500).send();
     }
-})
+});
+
+app.get('/report', authenticateToken, async (req, res) => {
+
+    async function try_get_report(){
+        const cached_reports_res = await DBcall('db_get_report', req.query);
+        const cached_reports = cached_reports_res?.rows;
+        // send response if reports in DB
+        if(cached_reports.length){ 
+            res.send(cached_reports); 
+            return true; 
+        }
+        return false;
+    }
+
+    function LLM(question, req){
+        if(req.credits < 1) return res.status(403).send('Monthly query limit exceeded'); 
+        const question_json = [{"role": "user", "content":question}]
+        const data = {messages: JSON.stringify(question_json), filingID:req.query.filingID, isAIReport:true};
+        const config = {'Content-Type':'application/json'};
+        return axios.post(AI_API_ADDR, data, config);
+    }
+
+    try{
+        if(!req.query.filingID) return clientError(res, 'filingID required');
+
+        //check DB cache
+        const has_sent_report = await try_get_report();
+        if(has_sent_report) return; 
+        
+        //if reports not in DB, generate
+        const questions_arr = (await DBcall('db_get_report_questions', req.query))?.rows;
+        const promises=[];
+
+        //filter out secondary questions (some data is pulled in 2 steps)
+        const questions_arr_primary = questions_arr.filter(q => !q.prev);
+
+        for(const question_obj of questions_arr_primary){
+            const {display, question, id} = question_obj;
+            if(req.credits < 1) return res.status(403).send('Monthly query limit exceeded'); 
+            const promise = LLM(question, req);
+            promises.push(promise);
+        }
+
+        const questions_arr_secondary = questions_arr.filter(q => q.prev);
+        const has_secondary_idlist = questions_arr.map(q => q.prev);
+
+        Promise.all(promises).then(async responses => {
+            for(let i=0; i < responses.length; i++){
+
+                const response = responses[i];
+                let questionid = questions_arr[i].id;
+
+                // if response has a next step, get it. now it's all in sequence (if you have more than one double question, is inefficient)
+                //todo for more double questions is another Promise.all queue for batching 2nd instead of interating and awaiting
+                if(has_secondary_idlist.includes(questionid) && !response.data.includes("insignificant")){
+                    const second_question_obj = questions_arr_secondary.find(q => q.prev === questionid);
+                    const second_response = await LLM(second_question_obj.question, req);
+                    response.data = second_response.data;
+                    questionid = second_question_obj.id;
+                }
+
+                const py_response = response.data.replaceAll('[ss]','');
+                //write to cache
+                await DBcall('db_insert_report_piece', { questionid:questionid, filingid:req.query.filingID, reply:py_response });
+            }
+            // try read from cache 2nd time
+            const has_sent_report = await try_get_report();
+            if(has_sent_report) return; 
+            else return serverError(res, 'Report generation error.');
+        }
+        );
+        // const res_data = py_response.data.replaceAll('[ss]','');
+        // const db_res = await DBcall('db_insert_report_piece', { questionid:id, filingid:req.query.filingID, reply:res_data });
+        //if(py_response.status === 200) creditAccount({uid:req.uid});
+
+        //res.send(db_res?.rows);
+    }catch(err){
+        console.error('Report get error ', req.query, err)
+        res.status(500).send();
+    }
+});
 
 //TODO: move this on top of file
 stripeConfig().then(async stripe => {

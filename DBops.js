@@ -343,6 +343,43 @@ const db_ops = {
         required_params: ['text', 'agent', 'callid'],
     },
 
+    db_get_report : {
+        fn: async (oo) => {
+            const {filingID} = oo;
+            const query = {
+                text:`select q.display, p.reply from reportPieces p join reportQuestions q on p.questionid=q.id where p.filingID=$1 where q.display not like '[noshow]%'`, 
+                values:[filingID]
+            }    
+            return await sql.query(query);
+        },
+        required_params: ['filingID'],
+    },
+
+    db_get_report_questions : {
+        fn: async () => {
+            const query = {
+                text:'SELECT id, display, question, prev from reportQuestions',
+                values:[]
+            }    
+            return await sql.query(query);
+        },
+        required_params: [],
+    },
+
+    db_insert_report_piece : {
+        fn: async (oo) => {
+            const {questionid, filingid, reply} = oo;
+            const query = {
+                text:`INSERT into reportPieces(questionid, filingid, reply)
+                    SELECT $1, $2, $3
+                `,
+                values:[questionid, filingid, reply]
+            }    
+            return await sql.query(query);
+        },
+        required_params: ['questionid', 'filingid', 'reply'],
+    },
+
     db_template : {
         fn: async (oo) => {
             const {cik} = oo;
