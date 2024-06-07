@@ -347,7 +347,7 @@ const db_ops = {
         fn: async (oo) => {
             const {filingID} = oo;
             const query = {
-                text:`select q.display, p.reply from reportPieces p join reportQuestions q on p.questionid=q.id where p.filingID=$1 where q.display not like '[noshow]%'`, 
+                text:`select q.display, p.reply from reportPieces p join reportQuestions q on p.questionid=q.id where p.filingID=$1 and q.display not like '[noshow]%'`, 
                 values:[filingID]
             }    
             return await sql.query(query);
