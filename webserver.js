@@ -29,6 +29,7 @@ const app = express();
 const apiRouter = express.Router();
 
 app.use(express.static('./served_assets'));
+app.use(compression());
 
 let corsOptions = {
     origin : ['http://localhost:3000', DOMAIN, 'https://www.nowreports.com'],
@@ -255,7 +256,7 @@ app.get('/tests/ai', async (req, res) => {
     }
 });
 
-app.get('/lastreport/:cik', compression(), async (req, res) => {
+app.get('/lastreport/:cik', async (req, res) => {
     function trim_xml(xmltext){
         if(req.query?.full) return xmltext;
         xmltext = xmltext 
