@@ -270,7 +270,7 @@ app.get('/lastreport/:cik', async (req, res) => {
     
         return match ? match[1] : null;
     }
-    const headers = {'User-Agent':'PostmanRuntime/7.36.0'};
+    const headers = {'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.3'};
     const db_res = await DBcall('db_getReport', req.params);
     if(!db_res?.rows?.[0]?.addr) return clientError(res, 'No report found');
     const link = `${global.appdata.SEC_BASEURL}${db_res.rows[0].addr}`;
