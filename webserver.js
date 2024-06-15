@@ -385,7 +385,7 @@ app.get('/report', authenticateToken, async (req, res) => {
             for(let i=0; i < responses.length; i++){
                 
                 const response = responses[i];
-                let questionid = questions_arr[i].id;
+                let questionid = questions_arr_primary[i].id;
                 
                 // if response has a next step, get it. now it's all in sequence (if you have more than one double question, is inefficient)
                 //todo for more double questions is another Promise.all queue for batching 2nd instead of interating and awaiting
@@ -400,7 +400,7 @@ app.get('/report', authenticateToken, async (req, res) => {
                 //write to cache
                 await DBcall('db_insert_report_piece', { questionid:questionid, filingid:req.query.filingID, reply:py_response });
             }
-
+            
             // try read from cache 2nd time
             const has_sent_report = await try_get_report();
             if(has_sent_report) return; 
