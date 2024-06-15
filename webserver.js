@@ -396,6 +396,8 @@ app.get('/report', authenticateToken, async (req, res) => {
                     questionid = second_question_obj.id;
                 }
                 
+                if(response.data.includes("insignificant")) continue;
+
                 const py_response = response.data.replaceAll('[ss]','');
                 //write to cache
                 await DBcall('db_insert_report_piece', { questionid:questionid, filingid:req.query.filingID, reply:py_response });
