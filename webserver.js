@@ -396,7 +396,10 @@ app.get('/report', authenticateToken, async (req, res) => {
                     questionid = second_question_obj.id;
                 }
                 
-                const py_response = response.data.replaceAll('[ss]','');
+                const py_response = response.data.replaceAll('[ss]','')
+                .replaceAll('HIGH DEBT', 'a high amount of debt')
+                .replaceAll('MEDIUM DEBT','a medium amount of debt')
+                .replaceAll('LOW DEBT', 'a low amount of debt');
                 //write to cache
                 await DBcall('db_insert_report_piece', { questionid:questionid, filingid:req.query.filingID, reply:py_response });
             }
