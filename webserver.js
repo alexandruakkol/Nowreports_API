@@ -292,7 +292,7 @@ app.post('/messages', async (req, res) => {
 app.post('/completionproxy', authenticateToken, async (req, res) => {
     try{
         if(req.credits < 1) return res.status(403).send('Monthly query limit exceeded'); 
-        const data = {messages:req.body.messages, filingID:req.body.filingID};
+        const data = {messages:req.body.messages, filingID:req.body.filingID, symbol:req.body?.symbol};
         const config = {'Content-Type':'application/json', responseType:'stream'};
         const py_response = await axios.post(AI_API_ADDR, data, config);
         if(py_response.status === 200) creditAccount(req.uid);
@@ -396,7 +396,10 @@ app.get('/report', authenticateToken, async (req, res) => {
                     questionid = second_question_obj.id;
                 }
                 
-                const py_response = response.data.replaceAll('[ss]','');
+                const py_response = response.data.replaceAll('[ss]','')
+                .replaceAll('HIGH DEBT', 'a high amount of debt')
+                .replaceAll('MEDIUM DEBT','a medium amount of debt')
+                .replaceAll('LOW DEBT', 'a low amount of debt');
                 //write to cache
                 await DBcall('db_insert_report_piece', { questionid:questionid, filingid:req.query.filingID, reply:py_response });
             }
