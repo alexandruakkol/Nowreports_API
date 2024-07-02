@@ -516,7 +516,7 @@ const st = {
         const db_add_credits_insert = await DBcall('db_add_credits', db_add_credits_data);
         if(db_add_credits_insert.rowCount != 1) return serverError(res, 'Invoicing error. Code 16'); //TODO: needs to be logged.
 
-        res.status(200).end();
+        res.status(201).end();
     }
 }
 
@@ -528,7 +528,7 @@ app.post('/stripe-webhook', async (req, res) => {
             st.checkout_completed(req, res);
             break;
     }
-    res.status(400).end();
+    res.status(201).end();
 });
 
 
