@@ -13,8 +13,6 @@ This module serves three major functions in the Nowreports system:
  
 Google Firebase is only used for authentication.
 
-Deployed in production on nowreports.com/api, via Nginx Reverse Proxy and PM2 for process management.
-
 Availability and performance is being monitored using Uptime Robot.
 
 ## Files
